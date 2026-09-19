@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>YOUR NAME — Digital Systems &amp; Analytics Portfolio</title>
+  <meta name="description" content="Portfolio of digital systems, analytics dashboards, automation and operational tools designed to turn complex business problems into structured workflows.">
+  <meta name="author" content="Digital Systems Architect">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="YOUR NAME — Digital Systems &amp; Analytics Portfolio">
+  <meta property="og:description" content="Turning operational problems into measurable digital systems. Dashboards, automation, and decision support tools.">
+  <meta property="og:image" content="assets/og-image.webp">
+  <meta property="og:type" content="website">
+  
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F7F6F2" media="(prefers-color-scheme: light)">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23111111'/><path d='M8 16L14 10L20 16L24 12' stroke='%237C5CFC' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/><circle cx='24' cy='12' r='2.5' fill='%23F7F6F2'/></svg>">
+  
+  <!-- Fonts: Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Minimal Desktop Cursor -->
+  <div class="cursor-dot" id="cursorDot" aria-hidden="true"></div>
+  <div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+  <!-- Background Decorative Grid & Noise -->
+  <div class="ambient-noise" aria-hidden="true"></div>
+  <div class="ambient-grid" aria-hidden="true"></div>
+
+  <!-- Navigation -->
+  <header class="site-header" id="siteHeader">
+    <div class="header-container">
+      <a href="#hero" class="brand-logo" aria-label="Portfolio Home">
+        <span class="brand-name" id="brandName">YOUR NAME</span>
+        <span class="brand-tag">SYSTEMS / ANALYTICS</span>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-list">
+          <li><a href="#about" class="nav-link">PROFILE</a></li>
+          <li><a href="#capabilities" class="nav-link">CAPABILITIES</a></li>
+          <li><a href="#featured" class="nav-link">FEATURED</a></li>
+          <li><a href="#work" class="nav-link">WORK</a></li>
+          <li><a href="#architecture" class="nav-link">ARCHITECTURE</a></li>
+          <li><a href="#stack" class="nav-link">STACK</a></li>
+          <li><a href="#contact" class="nav-link">CONTACT</a></li>
+        </ul>
+      </nav>
+
+      <!-- Nav Actions (Theme Switcher + Mobile Toggle) -->
+      <div class="header-actions">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark and light theme">
+          <span class="theme-icon-light" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </span>
+          <span class="theme-icon-dark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </span>
+          <span class="theme-label" id="themeLabel">LIGHT</span>
+        </button>
+
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobileNav">
+          <span class="menu-bar"></span>
+          <span class="menu-bar"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <ul class="mobile-nav-list">
+        <li><a href="#about" class="mobile-nav-link">PROFILE</a></li>
+        <li><a href="#capabilities" class="mobile-nav-link">CAPABILITIES</a></li>
+        <li><a href="#featured" class="mobile-nav-link">FEATURED</a></li>
+        <li><a href="#work" class="mobile-nav-link">WORK</a></li>
+        <li><a href="#architecture" class="mobile-nav-link">ARCHITECTURE</a></li>
+        <li><a href="#stack" class="mobile-nav-link">STACK</a></li>
+        <li><a href="#contact" class="mobile-nav-link">CONTACT</a></li>
+      </ul>
+      <div class="mobile-nav-footer">
+        <span class="mobile-status-dot"></span> Available for systems &amp; analytics projects
+      </div>
+    </div>
+  </header>
+
+  <main id="mainContent">
+    <!-- HERO SECTION -->
+    <section class="hero-section" id="hero">
+      <div class="section-container hero-grid">
+        <!-- Hero Content (Left) -->
+        <div class="hero-content">
+          <div class="hero-eyebrow">
+            <span class="eyebrow-pulse"></span>
+            <span>DIGITAL PRODUCT / DATA / AUTOMATION</span>
+          </div>
+
+          <h1 class="hero-headline">
+            Turning operational problems into measurable digital systems.
+          </h1>
+
+          <p class="hero-subheadline">
+            I design and build dashboards, analytics tools, automation systems, and operational applications that transform fragmented business processes into structured, actionable workflows.
+          </p>
+
+          <div class="hero-actions">
+            <a href="#work" class="btn btn-primary" data-magnetic>
+              <span>Explore My Work</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </a>
+            <a href="#about" class="btn btn-secondary" data-magnetic>
+              <span>View Profile</span>
+            </a>
+          </div>
+
+          <div class="hero-status-tag">
+            <span class="status-indicator"></span>
+            <span>Operational Technology &bull; Data Analytics &bull; Workflow Automation</span>
+          </div>
+        </div>
+
+        <!-- Hero Visual (Right) — Layered Operational UI Panels -->
+        <div class="hero-visual" id="heroVisual">
+          <div class="system-stage" id="systemStage">
+            <!-- Panel 1: KPI card -->
+            <div class="panel-card panel-kpi" data-speed="1.2">
+              <div class="panel-header">
+                <span class="panel-tag">OPERATIONAL VELOCITY</span>
+                <span class="panel-badge badge-success">LIVE SYNC</span>
+              </div>
+              <div class="kpi-value-row">
+                <span class="kpi-metric">+94.2%</span>
+                <span class="kpi-delta">SLA COMPLIANCE</span>
+              </div>
+              <div class="kpi-bar-track">
+                <div class="kpi-bar-fill" style="width: 94%;"></div>
+              </div>
+              <div class="panel-footnote">Validated across 12 operational checkpoints</div>
+            </div>
+
+            <!-- Panel 2: Analytics Chart Card -->
+            <div class="panel-card panel-chart" data-speed="0.8">
+              <div class="panel-header">
+                <span class="panel-tag">THROUGHPUT VS LATENCY</span>
+                <span class="panel-meta">HOURLY BATCH</span>
+              </div>
+              <div class="chart-spark-wrapper">
+                <svg class="sparkline-svg" viewBox="0 0 240 70" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="sparkGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>
+                      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M0,52 Q25,48 50,36 T100,42 T150,22 T190,16 T240,8 L240,70 L0,70 Z" fill="url(#sparkGradient)"/>
+                  <path d="M0,52 Q25,48 50,36 T100,42 T150,22 T190,16 T240,8" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
+                  <circle cx="190" cy="16" r="3.5" fill="var(--accent)"/>
+                  <circle cx="240" cy="8" r="4" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5"/>
+                </svg>
+              </div>
+              <div class="chart-stats-row">
+                <div><span class="label">BATCH RUNS</span> <span class="val">1,480</span></div>
+                <div><span class="label">ZERO LOSS</span> <span class="val">99.98%</span></div>
+              </div>
+            </div>
+
+            <!-- Panel 3: Inventory Status Card -->
+            <div class="panel-card panel-inventory" data-speed="1.0">
+              <div class="panel-header">
+                <span class="panel-tag">WAREHOUSE INVENTORY</span>
+                <span class="panel-status-pill">NFC ACTIVE</span>
+              </div>
+              <div class="inventory-status-row">
+                <div class="inv-item">
+                  <span class="inv-code">WH-01B</span>
+                  <span class="inv-title">Conversion Buffer</span>
+                </div>
+                <span class="inv-stock">4,820 pcs</span>
+              </div>
+              <div class="inventory-indicator-pills">
+                <span class="pill-active">Batch #892</span>
+                <span class="pill-active">Stock Opname OK</span>
+                <span class="pill-muted">Auto-Reorder Idle</span>
+              </div>
+            </div>
+
+            <!-- Panel 4: Ranking & Cashier Performance Card -->
+            <div class="panel-card panel-ranking" data-speed="1.4">
+              <div class="panel-header">
+                <span class="panel-tag">CASHIER PERFORMANCE LEDGER</span>
+                <span class="panel-meta">TOP QUARTILE</span>
+              </div>
+              <div class="ranking-row">
+                <span class="rank-pos">#01</span>
+                <span class="rank-name">Station Alpha — 04</span>
+                <span class="rank-score">99.4 pt</span>
+              </div>
+              <div class="ranking-row">
+                <span class="rank-pos">#02</span>
+                <span class="rank-name">Station Delta — 02</span>
+                <span class="rank-score">98.1 pt</span>
+              </div>
+            </div>
+
+            <!-- Panel 5: Operational Alert Card -->
+            <div class="panel-card panel-alert" data-speed="1.1">
+              <div class="alert-icon-wrap">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+              <div class="alert-text">
+                <strong>Zero-Discrepancy Trigger</strong>
+                <span>Automated reconciliation completed in 0.4s</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: PROFILE INTRODUCTION (ABOUT THE BUILDER) -->
+    <section class="section profile-section" id="about">
+      <div class="section-container">
+        <div class="section-label">01 &mdash; ABOUT THE BUILDER</div>
+
+        <div class="profile-layout">
+          <!-- Left: Profile Photo / Placeholder Frame -->
+          <div class="profile-media">
+            <div class="profile-frame">
+              <img src="assets/profile.webp" alt="Profile Portrait" id="profileImage" class="profile-photo" loading="lazy" onerror="this.classList.add('is-fallback'); this.style.display='none'; document.getElementById('profileFallback').style.display='flex';">
+              <div class="profile-placeholder" id="profileFallback">
+                <div class="profile-monogram">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  <span class="placeholder-caption">PRODUCT &bull; SYSTEMS &bull; DATA</span>
+                </div>
+              </div>
+              <div class="profile-card-badge">
+                <span class="badge-dot"></span>
+                <span>Systems Builder</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Profile Editorial Statement & Details -->
+          <div class="profile-editorial">
+            <h2 class="profile-lead">
+              I build practical digital systems that connect business operations, data, analytics, and decision making.
+            </h2>
+
+            <div class="profile-copy">
+              <p>
+                This portfolio represents a specialized collection of applications and automated infrastructure engineered to eliminate operational friction and manual ambiguity. Rather than producing superficial presentation dashboards, each product focuses on operational control:
+              </p>
+              
+              <ul class="focus-areas-list">
+                <li><span>Sales monitoring &amp; commercial intelligence</span></li>
+                <li><span>Operational control &amp; zero-defect pipelines</span></li>
+                <li><span>Quality control inspection workflows</span></li>
+                <li><span>Workforce management &amp; HC overtime calculation</span></li>
+                <li><span>End-to-end warehouse inventory movement</span></li>
+                <li><span>Cashier performance analytics &amp; scorecards</span></li>
+                <li><span>Customer feedback &amp; review management</span></li>
+                <li><span>Automated management decision reporting</span></li>
+              </ul>
+            </div>
+
+            <!-- Small Metrics Grid -->
+            <div class="profile-metrics-grid">
+              <div class="metric-card">
+                <span class="metric-number">09+</span>
+                <span class="metric-label">Digital Systems</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-number">04+</span>
+                <span class="metric-label">Business Areas</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-tagline">Analytics &bull; Automation &bull; Operations</span>
+                <span class="metric-sub">End-to-end architecture</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 6: CORE CAPABILITIES (WHAT I BUILD) -->
+    <section class="section capabilities-section" id="capabilities">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">02 &mdash; CORE CAPABILITIES</div>
+          <h2 class="section-title">WHAT I BUILD</h2>
+          <p class="section-subtitle">
+            Specialized engineering focused on operational clarity, structural accuracy, and automated continuity.
+          </p>
+        </div>
+
+        <div class="capabilities-grid" id="capabilitiesGrid">
+          <!-- Capabilities loaded via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 12: FEATURED PROJECT (FEATURED SYSTEM) -->
+    <section class="section featured-section" id="featured">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">03 &mdash; FEATURED SYSTEM</div>
+          <div class="featured-badge-row">
+            <span class="system-badge">OPERATIONAL SYSTEM</span>
+            <span class="featured-sub">Flagship Enterprise Architecture</span>
+          </div>
+          <h2 class="section-title">Stock Inventory Warehouse Management System</h2>
+          <p class="section-subtitle">
+            An end-to-end multi-facility warehouse management platform designed to eliminate stock drift, automate receiving reconciliation, and maintain strict material custody.
+          </p>
+        </div>
+
+        <div class="featured-card">
+          <div class="featured-visual-pane">
+            <div class="featured-browser-frame">
+              <div class="browser-header">
+                <div class="browser-dots">
+                  <span></span><span></span><span></span>
+                </div>
+                <div class="browser-address">system://warehouse-wms.internal/control-hub</div>
+                <div class="browser-status">
+                  <span class="status-live-dot"></span> LIVE ENGINE
+                </div>
+              </div>
+              <div class="featured-showcase-ui">
+                <div class="wms-header-bar">
+                  <div>
+                    <span class="wms-breadcrumb">FACILITY HUB / REGION CENTRAL</span>
+                    <h3 class="wms-title">Inventory Control &amp; Batch Conversion Console</h3>
+                  </div>
+                  <div class="wms-actions-preview">
+                    <span class="wms-pill">NFC Scanner: Active</span>
+                    <span class="wms-pill wms-pill-accent">Restock Audit Triggered</span>
+                  </div>
+                </div>
+
+                <div class="wms-kpi-row">
+                  <div class="wms-kpi-cell">
+                    <span class="lbl">TOTAL SKU MONITORED</span>
+                    <span class="val">1,248 Units</span>
+                    <span class="trend">&uarr; 100% Verified</span>
+                  </div>
+                  <div class="wms-kpi-cell">
+                    <span class="lbl">DAILY STOCK MOVEMENT</span>
+                    <span class="val">18,420 Items</span>
+                    <span class="trend">0 Variance</span>
+                  </div>
+                  <div class="wms-kpi-cell">
+                    <span class="lbl">CONVERSION EFFICIENCY</span>
+                    <span class="val">99.7%</span>
+                    <span class="trend">&bull; Automated yield calc</span>
+                  </div>
+                  <div class="wms-kpi-cell">
+                    <span class="lbl">EXPIRY ALERT BUFFER</span>
+                    <span class="val">0 Critical</span>
+                    <span class="trend">FIFO Enforced</span>
+                  </div>
+                </div>
+
+                <div class="wms-modules-grid">
+                  <div class="wms-module-card">
+                    <div class="module-title">
+                      <span class="module-code">MOD-01</span>
+                      <strong>Stock Movement Tracking</strong>
+                    </div>
+                    <p>Real-time audit log tracking every intake, bin transfer, and dispatch transaction with operator timestamps.</p>
+                  </div>
+                  <div class="wms-module-card">
+                    <div class="module-title">
+                      <span class="module-code">MOD-02</span>
+                      <strong>Receiving &amp; PO Reconciliation</strong>
+                    </div>
+                    <p>Cross-validates physical arrivals against purchase orders with automatic discrepancy alerts.</p>
+                  </div>
+                  <div class="wms-module-card">
+                    <div class="module-title">
+                      <span class="module-code">MOD-03</span>
+                      <strong>Raw Material Conversion</strong>
+                    </div>
+                    <p>Calculates batch yields, transformation scrap ratios, and converted inventory replenishment.</p>
+                  </div>
+                  <div class="wms-module-card">
+                    <div class="module-title">
+                      <span class="module-code">MOD-04</span>
+                      <strong>Physical Stock Opname</strong>
+                    </div>
+                    <p>NFC-guided handheld cycle counts replacing paper tally sheets with zero-latency cloud reconciliation.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="featured-info-pane">
+            <div class="featured-spec-group">
+              <span class="spec-label">SYSTEM SCOPE</span>
+              <p>Inventory Dashboard &bull; Stock Movement &bull; Receiving &bull; Conversion &bull; Stock Opname &bull; NFC Workflow &bull; Expiry Monitoring &bull; Restock Threshold Triggers</p>
+            </div>
+
+            <div class="featured-spec-group">
+              <span class="spec-label">CORE PROBLEM SOLVED</span>
+              <p>Manual stock registers caused silent shrinkages, unaccounted conversion scrap, and delayed management reporting. This system instituted end-to-end accountability across physical bin locations.</p>
+            </div>
+
+            <div class="featured-actions">
+              <button class="btn btn-primary" id="openFeaturedCaseStudyBtn" type="button" data-magnetic>
+                <span>Explore Full Case Study</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                  <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 7 & 8: SELECTED WORK (SELECTED SYSTEMS) -->
+    <section class="section work-section" id="work">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">04 &mdash; SELECTED SYSTEMS</div>
+          <h2 class="section-title">SELECTED SYSTEMS</h2>
+          <p class="section-subtitle">
+            A collection of digital systems designed around real operational problems.
+          </p>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="filter-toolbar">
+          <div class="filter-tabs" role="tablist" aria-label="Filter systems by category">
+            <button class="filter-btn is-active" data-filter="ALL" role="tab" aria-selected="true">ALL</button>
+            <button class="filter-btn" data-filter="ANALYTICS" role="tab" aria-selected="false">ANALYTICS</button>
+            <button class="filter-btn" data-filter="SALES" role="tab" aria-selected="false">SALES</button>
+            <button class="filter-btn" data-filter="OPERATIONS" role="tab" aria-selected="false">OPERATIONS</button>
+            <button class="filter-btn" data-filter="INVENTORY" role="tab" aria-selected="false">INVENTORY</button>
+            <button class="filter-btn" data-filter="HC" role="tab" aria-selected="false">HC</button>
+            <button class="filter-btn" data-filter="QUALITY" role="tab" aria-selected="false">QUALITY</button>
+          </div>
+
+          <div class="search-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="projectSearch" class="search-input" placeholder="Search systems..." aria-label="Search systems by title or tool">
+            <button type="button" class="search-clear" id="searchClear" aria-label="Clear search" style="display: none;">&times;</button>
+          </div>
+        </div>
+
+        <!-- Project Cards Container -->
+        <div class="projects-list" id="projectsContainer"></div>
+
+        <!-- Empty Search / Filter State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+          <div class="empty-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+          </div>
+          <h3 class="empty-title">No matching systems found</h3>
+          <p class="empty-desc">Try clearing the search query or selecting another operational category filter.</p>
+          <button class="btn btn-secondary" id="resetFilterBtn" type="button">Reset Filters</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 13: SYSTEM ARCHITECTURE VISUAL (FROM DATA TO DECISION) -->
+    <section class="section architecture-section" id="architecture">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">05 &mdash; ARCHITECTURE PIPELINE</div>
+          <h2 class="section-title">FROM DATA TO DECISION</h2>
+          <p class="section-subtitle">
+            How ground-level business friction is systematically transformed into automated decision infrastructure.
+          </p>
+        </div>
+
+        <div class="pipeline-container" id="pipelineFlow">
+          <div class="pipeline-track" aria-hidden="true">
+            <div class="pipeline-fill" id="pipelineFill"></div>
+          </div>
+
+          <div class="pipeline-nodes-grid">
+            <div class="pipeline-node" data-step="1">
+              <div class="node-badge">01 &bull; DATA</div>
+              <div class="node-card">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                  </svg>
+                </div>
+                <h3 class="node-title">Operational Data</h3>
+                <p class="node-desc">Raw input captures, point-of-sale logs, inventory bin counts, worker timecards, and transaction receipts.</p>
+                <span class="node-tag">CAPTURE &amp; INTAKE</span>
+              </div>
+            </div>
+
+            <div class="pipeline-node" data-step="2">
+              <div class="node-badge">02 &bull; PROCESS</div>
+              <div class="node-card">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                </div>
+                <h3 class="node-title">Validation &amp; Processing</h3>
+                <p class="node-desc">Automated schema validation, anomaly detection, unit conversions, and operational deduplication.</p>
+                <span class="node-tag">SANITIZATION &amp; RULES</span>
+              </div>
+            </div>
+
+            <div class="pipeline-node" data-step="3">
+              <div class="node-badge">03 &bull; SYSTEM</div>
+              <div class="node-card">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                </div>
+                <h3 class="node-title">Digital Workflow</h3>
+                <p class="node-desc">Apps Script web engines, role-based entry forms, NFC scanning flows, and event-driven automation triggers.</p>
+                <span class="node-tag">ENGINE &amp; CUSTODY</span>
+              </div>
+            </div>
+
+            <div class="pipeline-node" data-step="4">
+              <div class="node-badge">04 &bull; ANALYTICS</div>
+              <div class="node-card">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 20V10"></path>
+                    <path d="M12 20V4"></path>
+                    <path d="M6 20v-6"></path>
+                  </svg>
+                </div>
+                <h3 class="node-title">Dashboard &amp; Reporting</h3>
+                <p class="node-desc">Looker Studio models, interactive scorecards, real-time threshold monitors, and automated daily email digests.</p>
+                <span class="node-tag">VISUAL INTELLIGENCE</span>
+              </div>
+            </div>
+
+            <div class="pipeline-node" data-step="5">
+              <div class="node-badge">05 &bull; DECISION</div>
+              <div class="node-card">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                  </svg>
+                </div>
+                <h3 class="node-title">Management Decision</h3>
+                <p class="node-desc">Root-cause identification, proactive inventory restock, accurate overtime disbursements, and targeted commercial strategy.</p>
+                <span class="node-tag">ACTIONABLE CONTROL</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 15: WORKFLOW PHILOSOPHY -->
+    <section class="section philosophy-section" id="philosophy">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">06 &mdash; METHODOLOGY</div>
+          <h2 class="section-title">HOW I APPROACH A PROBLEM</h2>
+          <p class="section-subtitle">
+            A disciplined four-phase approach bridging ground-level reality with reliable technical architecture.
+          </p>
+        </div>
+
+        <div class="philosophy-timeline">
+          <div class="philosophy-step">
+            <div class="step-num">01</div>
+            <div class="step-phase">UNDERSTAND</div>
+            <h3 class="step-title">Understand the operational problem</h3>
+            <p class="step-desc">
+              Observe real frontline workflows. Pinpoint where data gets lost, why spreadsheets break, and where human manual delay creates operational bottlenecks.
+            </p>
+          </div>
+
+          <div class="philosophy-step">
+            <div class="step-num">02</div>
+            <div class="step-phase">STRUCTURE</div>
+            <h3 class="step-title">Structure data and workflow</h3>
+            <p class="step-desc">
+              Define the schema, data flow, validation constraints, and user access roles. Establish clean single-source-of-truth architectures before writing code.
+            </p>
+          </div>
+
+          <div class="philosophy-step">
+            <div class="step-num">03</div>
+            <div class="step-phase">BUILD</div>
+            <h3 class="step-title">Build the system and interface</h3>
+            <p class="step-desc">
+              Construct high-performance digital tools, resilient automations, and intuitive interfaces that frontline teams actually embrace rather than avoid.
+            </p>
+          </div>
+
+          <div class="philosophy-step">
+            <div class="step-num">04</div>
+            <div class="step-phase">MEASURE</div>
+            <h3 class="step-title">Measure performance and improve</h3>
+            <p class="step-desc">
+              Track operational turnaround, verify data integrity, and continuously refine user friction points to guarantee lasting organizational value.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 16: IMPACT SECTION -->
+    <section class="section impact-section" id="impact">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">07 &mdash; CORE IMPACT</div>
+          <h2 class="section-title">FROM OPERATIONAL PAIN TO SYSTEM VALUE</h2>
+          <p class="section-subtitle">
+            Grounded outcomes delivered through thoughtful system design.
+          </p>
+        </div>
+
+        <div class="impact-grid">
+          <div class="impact-card">
+            <div class="impact-indicator"></div>
+            <h3 class="impact-headline">FROM MANUAL TO STRUCTURED</h3>
+            <p class="impact-copy">
+              Fragmented operational processes become structured digital workflows with strict validation and transparent audit logs.
+            </p>
+          </div>
+
+          <div class="impact-card">
+            <div class="impact-indicator"></div>
+            <h3 class="impact-headline">FROM RAW DATA TO INSIGHT</h3>
+            <p class="impact-copy">
+              Raw operational data becomes actionable performance information, enabling leaders to understand trends without wrestling spreadsheets.
+            </p>
+          </div>
+
+          <div class="impact-card">
+            <div class="impact-indicator"></div>
+            <h3 class="impact-headline">FROM REPORTING TO MONITORING</h3>
+            <p class="impact-copy">
+              Static backward-looking reporting evolves into real-time interactive monitoring, enabling proactive intervention before discrepancies grow.
+            </p>
+          </div>
+
+          <div class="impact-card">
+            <div class="impact-indicator"></div>
+            <h3 class="impact-headline">FROM REPETITION TO AUTOMATION</h3>
+            <p class="impact-copy">
+              Repeated manual calculations and clerical copy-pasting become automated background workflows that run error-free on schedule.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 14: TECHNOLOGY STACK -->
+    <section class="section stack-section" id="stack">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">08 &mdash; TECHNOLOGY</div>
+          <h2 class="section-title">TECHNOLOGY</h2>
+          <p class="section-subtitle">
+            Tools chosen for pragmatism, speed of deployment, operational stability, and low maintenance overhead.
+          </p>
+        </div>
+
+        <div class="tech-typography-grid" id="techGrid"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 17: TIMELINE / JOURNEY -->
+    <section class="section timeline-section" id="timeline" style="display: none;">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-label">09 &mdash; JOURNEY</div>
+          <h2 class="section-title">BUILDING DIGITAL SYSTEMS</h2>
+        </div>
+
+        <div class="timeline-list" id="timelineList"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 18: CONTACT SECTION -->
+    <section class="section contact-section" id="contact">
+      <div class="section-container">
+        <div class="contact-box">
+          <div class="contact-content">
+            <div class="section-label">10 &mdash; INITIATE DIALOGUE</div>
+            <h2 class="contact-headline">
+              Have a problem that can be turned into a system?
+            </h2>
+            <p class="contact-subheadline">
+              I enjoy building practical digital tools that make operations easier to understand, control, and improve. Let&rsquo;s discuss your operational workflow.
+            </p>
+            
+            <div class="contact-actions">
+              <a href="mailto:contact@yourdomain.com" class="btn btn-primary" id="contactEmailBtn" data-magnetic>
+                <span>Let's Connect</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="contact-channels">
+            <div class="channel-group">
+              <span class="channel-label">EMAIL</span>
+              <a href="mailto:contact@yourdomain.com" class="channel-link" id="channelEmail">contact@yourdomain.com</a>
+            </div>
+            <div class="channel-group">
+              <span class="channel-label">LINKEDIN</span>
+              <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link" id="channelLinkedin">linkedin.com/in/yourprofile</a>
+            </div>
+            <div class="channel-group">
+              <span class="channel-label">GITHUB</span>
+              <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link" id="channelGithub">github.com/yourhandle</a>
+            </div>
+            <div class="channel-group">
+              <span class="channel-label">PORTFOLIO DEPLOYMENT</span>
+              <span class="channel-val">Cloudflare Pages &bull; Static PWA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="section-container footer-container">
+      <div class="footer-left">
+        <span class="footer-brand" id="footerBrand">YOUR NAME</span>
+        <span class="footer-copy">&copy; <span id="currentYear">2026</span> &bull; Digital Systems &amp; Analytics Portfolio</span>
+      </div>
+      <div class="footer-center">
+        <span class="footer-pill"><span class="status-indicator"></span> All Systems Operational</span>
+      </div>
+      <div class="footer-right">
+        <a href="#hero" class="back-to-top" aria-label="Back to top">
+          <span>Top</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SECTION 10: PROJECT DETAIL MODAL / CASE STUDY DRAWER -->
+  <div class="modal-backdrop" id="caseStudyModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modalTitle">
+    <div class="modal-dialog" id="modalDialog">
+      <div class="modal-header">
+        <div class="modal-header-meta">
+          <span class="modal-project-number" id="modalNumber">01</span>
+          <span class="modal-project-category" id="modalCategory">SALES ANALYTICS</span>
+        </div>
+        <button class="modal-close-btn" id="modalCloseBtn" type="button" aria-label="Close case study modal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body" id="modalBody">
+        <div class="modal-title-row">
+          <h2 class="modal-title" id="modalTitle">System Title</h2>
+          <span class="modal-role-pill" id="modalRole">System Design / Analytics</span>
+        </div>
+
+        <p class="modal-intro" id="modalIntro">System description overview</p>
+
+        <div class="modal-visual-frame" id="modalVisual"></div>
+
+        <div class="modal-sections-grid">
+          <div class="modal-section-card">
+            <span class="modal-sec-tag">01 &bull; PROBLEM</span>
+            <h3 class="modal-sec-heading">Operational Bottleneck</h3>
+            <p class="modal-sec-text" id="modalProblem">Problem content</p>
+          </div>
+
+          <div class="modal-section-card">
+            <span class="modal-sec-tag">02 &bull; APPROACH</span>
+            <h3 class="modal-sec-heading">System Architecture</h3>
+            <p class="modal-sec-text" id="modalApproach">Approach content</p>
+          </div>
+
+          <div class="modal-section-card">
+            <span class="modal-sec-tag">03 &bull; SOLUTION</span>
+            <h3 class="modal-sec-heading">Application Workflow</h3>
+            <p class="modal-sec-text" id="modalSolution">Solution content</p>
+          </div>
+
+          <div class="modal-section-card">
+            <span class="modal-sec-tag">04 &bull; IMPACT</span>
+            <h3 class="modal-sec-heading">Operational Value</h3>
+            <p class="modal-sec-text" id="modalImpact">Impact content</p>
+          </div>
+        </div>
+
+        <div class="modal-meta-group">
+          <span class="modal-group-label">TECHNOLOGY STACK</span>
+          <div class="modal-tools-list" id="modalTools"></div>
+        </div>
+
+        <div class="modal-meta-group">
+          <span class="modal-group-label">KEY SYSTEM FEATURES</span>
+          <ul class="modal-features-list" id="modalFeatures"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="script.js"></script>
+</body>
+</html>
