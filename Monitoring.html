@@ -1,0 +1,208 @@
+<!-- =========================================================================
+     Monitoring.html — Kanban status MR
+     ========================================================================= -->
+<section class="page" id="page-monitoring">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">MR Monitoring</h1>
+      <p class="page-head__sub">
+        Posisi seluruh dokumen Market Return pada alur administrasi
+      </p>
+    </div>
+    <div class="page-actions">
+      <div class="segmented" data-monitor-view>
+        <button data-view="board" class="is-active">Kanban</button>
+        <button data-view="sla">SLA</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-filter-slot></div>
+
+  <div class="grid grid--kpi" data-monitor-kpi style="margin-bottom:16px"></div>
+
+  <div data-monitor-panel="board">
+    <div class="kanban" data-monitor-board></div>
+    <div data-monitor-rejected style="margin-top:16px"></div>
+  </div>
+
+  <div data-monitor-panel="sla" hidden>
+    <div class="card">
+      <div class="card__head">
+        <div><div class="card-title">Kepatuhan SLA per tahap</div>
+          <div class="caption">Dokumen yang melewati batas waktu tahapannya</div></div>
+      </div>
+      <div class="card__body"><div data-monitor-sla></div></div>
+    </div>
+  </div>
+</section>
+
+<script>
+definePage('monitoring', {
+  title: 'Monitoring',
+  breadcrumb: ['MR Dairy', 'Monitoring'],
+  permission: 'monitoring.view',
+  filters: ['dateRange', 'region', 'account', 'search'],
+
+  mount: function (ctx) {
+    ctx.root.__state = { view: 'board' };
+    ctx.all('[data-monitor-view] button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var view = btn.getAttribute('data-view');
+        ctx.root.__state.view = view;
+        ctx.all('[data-monitor-view] button').forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+        ctx.all('[data-monitor-panel]').forEach(function (p) {
+          p.hidden = p.getAttribute('data-monitor-panel') !== view;
+        });
+        Monitor.render(ctx);
+      });
+    });
+  },
+
+  load: function (ctx) {
+    ctx.el('[data-monitor-kpi]').innerHTML = UI.skeletonKpi(4);
+    ctx.el('[data-monitor-board]').innerHTML = '<div style="display:flex;gap:12px">'
+      + [0, 1, 2, 3].map(function () {
+        return '<div style="flex:0 0 290px">' + UI.skeletonKpi(1) + '</div>';
+      }).join('') + '</div>';
+
+    Api.call('monitoring.board', { filters: ctx.filters(), limitPerColumn: 25 }).then(function (data) {
+      ctx.root.__board = data;
+      paint(function () { Monitor.render(ctx); });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat monitoring');
+      ctx.el('[data-monitor-board]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+      ctx.el('[data-monitor-kpi]').innerHTML = '';
+    });
+  }
+});
+
+var Monitor = {
+  render: function (ctx) {
+    var data = ctx.root.__board;
+    if (!data) return;
+    var s = data.summary;
+
+    ctx.el('[data-monitor-kpi]').innerHTML = [
+      UI.kpiCard({ label: 'Total Dokumen', valueHtml: UI.fmt.number(s.total), unit: 'dok', iconName: 'clipboard' }),
+      UI.kpiCard({ label: 'Dalam Proses', valueHtml: UI.fmt.number(s.pending), unit: 'dok', iconName: 'clock', accent: true }),
+      UI.kpiCard({ label: 'Lewat SLA', valueHtml: UI.fmt.number(s.overdue), unit: 'dok', iconName: 'alert',
+        sub: 'on time ' + UI.fmt.decimal(s.onTimeRate, 1) + '%' }),
+      UI.kpiCard({ label: 'Nilai Return', valueHtml: UI.fmt.compactCurrency(s.totalValue), iconName: 'package',
+        sub: UI.fmt.number(s.totalQty) + ' qty' })
+    ].join('');
+
+    if (ctx.root.__state.view === 'board') Monitor.renderBoard(ctx, data);
+    else Monitor.renderSla(ctx, data);
+  },
+
+  renderBoard: function (ctx, data) {
+    var hasCards = data.columns.some(function (col) { return col.count > 0; });
+    if (!hasCards) {
+      ctx.el('[data-monitor-board]').innerHTML = UI.emptyState({
+        icon: 'kanban', title: 'Belum ada dokumen berjalan',
+        desc: 'Dokumen MR yang diinput akan muncul otomatis pada papan monitoring ini.'
+      });
+      ctx.el('[data-monitor-rejected]').innerHTML = '';
+      return;
+    }
+
+    ctx.el('[data-monitor-board]').innerHTML = data.columns.map(function (col) {
+      var tone = UI.TONE_BY_STATUS[col.status] || 'muted';
+      return '<div class="kanban__col"><div class="kanban__head">'
+        + '<div class="kanban__title">' + UI.badge(col.label, tone, true)
+        + '<span class="kanban__count num">' + col.count + '</span>'
+        + (col.overdue ? '<span class="badge badge--danger" title="Lewat SLA">' + col.overdue + '</span>' : '')
+        + '</div>'
+        + '<div class="kanban__meta">' + UI.fmt.number(col.qty) + ' qty · '
+        + UI.fmt.compactCurrency(col.value) + '</div></div>'
+        + '<div class="kanban__body">'
+        + (col.cards.length ? col.cards.map(Monitor.card).join('')
+          : '<div class="caption" style="padding:12px;text-align:center">Tidak ada dokumen</div>')
+        + (col.count > col.cards.length
+          ? '<div class="caption" style="padding:6px;text-align:center">+' + (col.count - col.cards.length)
+            + ' dokumen lain</div>' : '')
+        + '</div></div>';
+    }).join('');
+
+    var rejected = data.rejected;
+    ctx.el('[data-monitor-rejected]').innerHTML = rejected.count ? '<div class="card">'
+      + '<div class="card__head"><div><div class="card-title">Dokumen ditolak</div>'
+      + '<div class="caption">' + rejected.count + ' dokumen dengan alasan tercatat</div></div></div>'
+      + '<div class="card__body card__body--flush">' + UI.table({
+        compact: true,
+        columns: [
+          { key: 'MR_ID', label: 'MR', render: function (r) { return '<span class="mono">' + UI.escapeHtml(r.MR_ID) + '</span>'; } },
+          { key: 'accountName', label: 'Account', render: function (r) { return UI.escapeHtml(r.accountName); } },
+          { key: 'skuName', label: 'SKU', render: function (r) { return UI.escapeHtml(r.skuName); } },
+          { key: 'RETURN_QTY', label: 'Qty', align: 'right', render: function (r) { return UI.fmt.number(r.RETURN_QTY); } },
+          { key: 'REJECT_REASON', label: 'Alasan', render: function (r) { return UI.escapeHtml(r.REJECT_REASON || '—'); } }
+        ],
+        rows: rejected.cards,
+        rowAttrs: function (row) { return 'style="cursor:pointer" data-monitor-mr="' + UI.escapeHtml(row.MR_ID) + '"'; }
+      }) + '</div></div>' : '';
+
+    ctx.all('[data-monitor-card], [data-monitor-mr]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        App.navigate('mr', { mrId: el.getAttribute('data-monitor-card') || el.getAttribute('data-monitor-mr') });
+      });
+    });
+  },
+
+  card: function (mr) {
+    var slaTone = mr.sla && mr.sla.label === 'OVERDUE' ? 'danger'
+      : (mr.sla && mr.sla.label === 'DUE_SOON' ? 'warning' : 'success');
+    return '<div class="kcard" data-monitor-card="' + UI.escapeHtml(mr.MR_ID) + '">'
+      + '<div class="kcard__top"><span class="kcard__id mono">' + UI.escapeHtml(mr.MR_ID) + '</span>'
+      + (mr.missedPo ? UI.badge('MISSED PO', 'danger') : UI.badge(mr.sla ? mr.sla.label.replace('_', ' ') : 'ON TIME', slaTone))
+      + '</div>'
+      + '<div class="kcard__title">' + UI.escapeHtml(mr.accountName) + '</div>'
+      + '<div class="kcard__sku">' + UI.escapeHtml(mr.skuName) + '</div>'
+      + '<div class="kcard__stats">'
+      + '<span class="kcard__stat">Qty <b>' + UI.fmt.number(mr.RETURN_QTY) + '</b></span>'
+      + '<span class="kcard__stat">' + (mr.PICKUP_DATE ? 'Pickup <b>' + UI.fmt.date(mr.PICKUP_DATE) + '</b>'
+        : '<span class="text-warning">belum dijadwalkan</span>') + '</span>'
+      + '</div>'
+      + (mr.SO_NUMBER ? '<div class="kcard__stats" style="border-top:0;padding-top:4px">'
+        + '<span class="kcard__stat mono">' + UI.escapeHtml(mr.SO_NUMBER) + '</span></div>' : '')
+      + (mr.PIC ? '<div class="kcard__stats" style="border-top:0;padding-top:2px">'
+        + '<span class="kcard__stat">PIC <b>' + UI.escapeHtml(mr.PIC) + '</b></span></div>' : '')
+      + '</div>';
+  },
+
+  renderSla: function (ctx, data) {
+    var rows = data.columns.map(function (col) {
+      var total = col.count || 0;
+      var overdue = col.overdue || 0;
+      return {
+        status: col.label, total: total, overdue: overdue,
+        onTime: total - overdue,
+        rate: total ? ((total - overdue) / total) * 100 : 100
+      };
+    });
+    ctx.el('[data-monitor-sla]').innerHTML = UI.table({
+      compact: true,
+      columns: [
+        { key: 'status', label: 'Tahap', render: function (r) { return '<span class="t-strong">' + UI.escapeHtml(r.status) + '</span>'; } },
+        { key: 'total', label: 'Dokumen', align: 'right', render: function (r) { return UI.fmt.number(r.total); } },
+        { key: 'onTime', label: 'Sesuai SLA', align: 'right', render: function (r) { return UI.fmt.number(r.onTime); } },
+        {
+          key: 'overdue', label: 'Lewat SLA', align: 'right', render: function (r) {
+            return r.overdue ? '<span class="text-danger" style="font-weight:650">' + r.overdue + '</span>' : '0';
+          }
+        },
+        {
+          key: 'rate', label: 'Kepatuhan', align: 'right', render: function (r) {
+            return '<div style="min-width:120px">'
+              + '<div class="row row--between" style="font-size:12px"><span></span><b>'
+              + UI.fmt.decimal(r.rate, 1) + '%</b></div>'
+              + UI.miniBar(r.rate, r.rate >= 90 ? 'success' : (r.rate >= 70 ? 'warning' : 'danger')) + '</div>';
+          }
+        }
+      ],
+      rows: rows
+    });
+  }
+};
+</script>

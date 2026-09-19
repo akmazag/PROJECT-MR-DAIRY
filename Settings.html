@@ -1,0 +1,288 @@
+<!-- =========================================================================
+     Settings.html — Business rules, status sistem, demo data
+     ========================================================================= -->
+<section class="page" id="page-settings">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Settings</h1>
+      <p class="page-head__sub">
+        Seluruh business rule dapat diubah di sini tanpa menyentuh source code
+      </p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn--primary btn--sm" data-set="save" disabled>
+        Simpan perubahan (<span data-set-count>0</span>)
+      </button>
+    </div>
+  </div>
+
+  <div class="tabs" data-set-tabs>
+    <button class="tab is-active" data-tab="rules">Business Rules</button>
+    <button class="tab" data-tab="system">System Setup Status</button>
+  </div>
+
+  <div data-tab-panel="rules">
+    <div class="filterbar" style="margin-bottom:16px">
+      <span class="search-wrap" style="flex:1 1 220px;max-width:320px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <input class="input input--search" type="search" data-set-search placeholder="Cari konfigurasi…">
+      </span>
+      <select class="select" data-set-group style="max-width:180px"><option value="">Semua kelompok</option></select>
+    </div>
+    <div data-set-list class="stack"></div>
+  </div>
+
+  <div data-tab-panel="system" hidden>
+    <div class="grid grid--2">
+      <div class="card">
+        <div class="card__head"><div class="card-title">System Setup Status</div></div>
+        <div class="card__body"><div data-set-status class="status-list"></div></div>
+      </div>
+      <div class="card">
+        <div class="card__head"><div class="card-title">Demo data</div></div>
+        <div class="card__body">
+          <div class="stack">
+            <p class="caption">
+              Demo data berisi 2 skenario wajib (DEMO-ACCOUNT-001 / DEMO-MILK-001 dan
+              DEMO-ACCOUNT-002 / DEMO-MILK-002) beserta account dan SKU realistis lain
+              sehingga seluruh modul langsung memiliki data.
+            </p>
+            <div class="row" style="gap:8px">
+              <button class="btn btn--secondary btn--sm" data-set="demo">Buat demo data</button>
+              <button class="btn btn--danger btn--sm" data-set="demo-reset">Reset demo data</button>
+            </div>
+            <div data-set-demo-result></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+definePage('settings', {
+  title: 'Settings',
+  breadcrumb: ['MR Dairy', 'Settings'],
+  permission: 'settings.view',
+
+  mount: function (ctx) {
+    ctx.root.__state = { changes: {}, q: '', group: '', tab: 'rules' };
+    ctx.all('[data-set-tabs] .tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var name = tab.getAttribute('data-tab');
+        ctx.root.__state.tab = name;
+        ctx.all('[data-set-tabs] .tab').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
+        ctx.all('[data-tab-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-tab-panel') !== name; });
+        if (name === 'system') Settings.loadStatus(ctx);
+      });
+    });
+    ctx.el('[data-set-search]').addEventListener('input', debounce(function (event) {
+      ctx.root.__state.q = event.target.value.toLowerCase();
+      Settings.render(ctx);
+    }, 250));
+    ctx.el('[data-set-group]').addEventListener('change', function (event) {
+      ctx.root.__state.group = event.target.value;
+      Settings.render(ctx);
+    });
+    ctx.root.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-set]');
+      if (!btn) return;
+      var action = btn.getAttribute('data-set');
+      if (action === 'save') Settings.save(ctx);
+      if (action === 'demo') Settings.runDemo(ctx, false);
+      if (action === 'demo-reset') Settings.runDemo(ctx, true);
+    });
+  },
+
+  load: function (ctx) { Settings.load(ctx); }
+});
+
+var Settings = {
+  load: function (ctx) {
+    ctx.el('[data-set-list]').innerHTML = UI.skeletonTable(10, 3);
+    Api.call('settings.list', {}).then(function (data) {
+      ctx.root.__settings = data.rows;
+      var groups = [];
+      data.rows.forEach(function (row) { if (groups.indexOf(row.group) === -1) groups.push(row.group); });
+      ctx.el('[data-set-group]').innerHTML = '<option value="">Semua kelompok</option>'
+        + groups.sort().map(function (g) { return '<option value="' + g + '">' + g + '</option>'; }).join('');
+      Settings.render(ctx);
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat settings');
+      ctx.el('[data-set-list]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+    });
+  },
+
+  render: function (ctx) {
+    var state = ctx.root.__state;
+    var rows = (ctx.root.__settings || []).filter(function (row) {
+      if (state.group && row.group !== state.group) return false;
+      if (state.q) {
+        var hay = (row.KEY + ' ' + row.DESCRIPTION).toLowerCase();
+        if (hay.indexOf(state.q) === -1) return false;
+      }
+      return true;
+    });
+
+    if (!rows.length) {
+      ctx.el('[data-set-list]').innerHTML = UI.emptyState({
+        icon: 'settings', title: 'Konfigurasi tidak ditemukan', desc: 'Ubah kata kunci pencarian.'
+      });
+      return;
+    }
+
+    var canEdit = App.can('settings.edit');
+    var byGroup = {};
+    rows.forEach(function (row) {
+      if (!byGroup[row.group]) byGroup[row.group] = [];
+      byGroup[row.group].push(row);
+    });
+
+    ctx.el('[data-set-list]').innerHTML = Object.keys(byGroup).sort().map(function (group) {
+      return '<div class="card"><div class="card__head"><div class="card-title">' + UI.escapeHtml(group)
+        + '</div><span class="caption">' + byGroup[group].length + ' konfigurasi</span></div>'
+        + '<div class="card__body card__body--flush">' + UI.table({
+          compact: true,
+          columns: [
+            {
+              key: 'KEY', label: 'Key', render: function (r) {
+                return '<span class="mono t-strong">' + UI.escapeHtml(r.KEY) + '</span>'
+                  + '<span class="table__cell-sub">' + UI.escapeHtml(r.DESCRIPTION) + '</span>';
+              }
+            },
+            {
+              key: 'VALUE', label: 'Nilai', align: 'right', render: function (r) {
+                var isBool = ['TRUE', 'FALSE'].indexOf(String(r.DEFAULT_VALUE).toUpperCase()) !== -1;
+                if (!canEdit) return '<span class="mono">' + UI.escapeHtml(r.VALUE) + '</span>';
+                if (isBool) {
+                  return '<select class="select" data-setting="' + r.KEY + '" style="max-width:110px">'
+                    + ['TRUE', 'FALSE'].map(function (v) {
+                      return '<option value="' + v + '"' + (String(r.VALUE).toUpperCase() === v ? ' selected' : '') + '>'
+                        + v + '</option>';
+                    }).join('') + '</select>';
+                }
+                return '<input class="input" data-setting="' + r.KEY + '" value="' + UI.escapeHtml(r.VALUE)
+                  + '" style="max-width:150px;text-align:right">';
+              }
+            },
+            {
+              key: 'DEFAULT_VALUE', label: 'Default', align: 'right', render: function (r) {
+                return '<span class="caption mono">' + UI.escapeHtml(r.DEFAULT_VALUE) + '</span>'
+                  + (r.isDefault ? '' : '<span class="table__cell-sub text-warning">diubah</span>');
+              }
+            },
+            {
+              key: '_a', label: '', align: 'right', render: function (r) {
+                if (!canEdit || r.isDefault) return '';
+                return '<button class="btn btn--ghost btn--sm" data-setting-reset="' + r.KEY
+                  + '" title="Kembalikan ke default">' + UI.icon('refresh', 13) + '</button>';
+              }
+            }
+          ],
+          rows: byGroup[group]
+        }) + '</div></div>';
+    }).join('');
+
+    ctx.all('[data-setting]').forEach(function (input) {
+      input.addEventListener('input', function () { Settings.track(ctx, input); });
+      input.addEventListener('change', function () { Settings.track(ctx, input); });
+    });
+    ctx.all('[data-setting-reset]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        Api.call('settings.reset', { key: btn.getAttribute('data-setting-reset') }).then(function (res) {
+          Toast.success('Dikembalikan ke default', res.key + ' = ' + res.value);
+          delete ctx.root.__state.changes[res.key];
+          Settings.load(ctx);
+        }).catch(function (err) { Api.handle(err, 'Gagal reset konfigurasi'); });
+      });
+    });
+  },
+
+  track: function (ctx, input) {
+    var key = input.getAttribute('data-setting');
+    var original = (ctx.root.__settings || []).filter(function (r) { return r.KEY === key; })[0];
+    if (!original) return;
+    if (String(input.value) === String(original.VALUE)) delete ctx.root.__state.changes[key];
+    else ctx.root.__state.changes[key] = input.value;
+    var count = Object.keys(ctx.root.__state.changes).length;
+    ctx.el('[data-set-count]').textContent = count;
+    ctx.el('[data-set="save"]').disabled = count === 0;
+  },
+
+  save: function (ctx) {
+    var changes = ctx.root.__state.changes;
+    var items = Object.keys(changes).map(function (key) { return { key: key, value: changes[key] }; });
+    if (!items.length) return;
+    Modal.confirm({
+      title: 'Simpan perubahan konfigurasi',
+      sub: items.length + ' business rule akan diperbarui.',
+      body: UI.alert('warning', 'Berdampak langsung',
+        'Perubahan mempengaruhi perhitungan allocation, risiko, SOP dan validasi MR pada seluruh aplikasi.')
+        + '<div class="panel" style="margin-top:12px"><div class="mono" style="font-size:11.5px;line-height:1.8">'
+        + items.map(function (i) { return UI.escapeHtml(i.key) + ' = ' + UI.escapeHtml(i.value); }).join('<br>')
+        + '</div></div>',
+      confirmLabel: 'Simpan'
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      Api.call('settings.update', { items: items }).then(function (res) {
+        Toast.success('Konfigurasi tersimpan', res.updated + ' business rule diperbarui.');
+        ctx.root.__state.changes = {};
+        ctx.el('[data-set-count]').textContent = '0';
+        ctx.el('[data-set="save"]').disabled = true;
+        Settings.load(ctx);
+      }).catch(function (err) { Api.handle(err, 'Gagal menyimpan konfigurasi'); });
+    });
+  },
+
+  loadStatus: function (ctx) {
+    ctx.el('[data-set-status]').innerHTML = UI.skeletonTable(5, 2);
+    Api.call('system.status', {}).then(function (status) {
+      var rows = [
+        { label: 'Database', value: status.database.label, detail: status.database.detail },
+        { label: 'Sheets', value: status.sheets.label, detail: status.sheets.found + '/' + status.sheets.total + ' sheet' },
+        { label: 'Configuration', value: status.configuration.label, detail: status.configuration.settings + ' business rule' },
+        { label: 'Users', value: status.users.label, detail: status.users.total + ' user' },
+        {
+          label: 'Demo Data', value: status.demoData.label,
+          detail: status.demoData.accounts + ' account · ' + status.demoData.skus + ' SKU · '
+            + status.demoData.sales + ' baris sales · ' + status.demoData.mr + ' dokumen MR'
+        }
+      ];
+      ctx.el('[data-set-status]').innerHTML = rows.map(function (row) {
+        var tone = row.value === 'READY' ? 'success' : (row.value === 'EMPTY' ? 'warning' : 'danger');
+        return '<div class="status-row"><div><div class="status-row__label">' + row.label + '</div>'
+          + '<div class="status-row__detail">' + UI.escapeHtml(row.detail || '') + '</div></div>'
+          + UI.badge(row.value, tone) + '</div>';
+      }).join('');
+    }).catch(function (err) { Api.handle(err, 'Gagal memuat status'); });
+  },
+
+  runDemo: function (ctx, reset) {
+    var run = function () {
+      ctx.el('[data-set-demo-result]').innerHTML = '<div class="row" style="gap:8px">'
+        + '<span class="spinner spinner--dark"></span><span class="caption">Memproses demo data…</span></div>';
+      Api.call('system.demo', { reset: reset }).then(function (data) {
+        ctx.el('[data-set-demo-result]').innerHTML = UI.alert(
+          data.skipped ? 'info' : 'success',
+          data.skipped ? 'Demo data sudah tersedia' : 'Demo data siap',
+          data.skipped ? 'Gunakan Reset demo data untuk membangun ulang dari awal.'
+            : 'Seluruh modul kini memiliki data untuk dijelajahi.');
+        Settings.loadStatus(ctx);
+      }).catch(function (err) {
+        ctx.el('[data-set-demo-result]').innerHTML = UI.alert('danger', 'Gagal', err.message || '');
+      });
+    };
+    if (!reset) { run(); return; }
+    Modal.confirm({
+      title: 'Reset demo data',
+      sub: 'Seluruh data transaksi, MR dan rencana akan dihapus lalu dibuat ulang.',
+      body: UI.alert('danger', 'Tindakan tidak dapat dibatalkan',
+        'Data account, SKU, sales, return, stock, MR dan allocation plan akan dibangun ulang dari awal. '
+        + 'User dan konfigurasi tidak terpengaruh.'),
+      confirmLabel: 'Reset sekarang', tone: 'danger'
+    }).then(function (confirmed) { if (confirmed) run(); });
+  }
+};
+</script>

@@ -1,0 +1,8 @@
+node_modules/
+.clasp.json
+*.log
+.DS_Store
+.shots/
+tools/.generated/
+PROJECT-MR-DAIRY.zip
+PROJECT-MR-DAIRY.bundle

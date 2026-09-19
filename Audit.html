@@ -1,0 +1,174 @@
+<!-- =========================================================================
+     Audit.html — Audit Log
+     ========================================================================= -->
+<section class="page" id="page-audit">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Audit Log</h1>
+      <p class="page-head__sub">
+        Jejak seluruh aktivitas penting: login, perubahan data, approval, override dan pembuatan SO
+      </p>
+    </div>
+  </div>
+
+  <div class="filterbar" style="margin-bottom:16px">
+    <span class="search-wrap" style="flex:1 1 220px;max-width:300px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input class="input input--search" type="search" data-audit-q placeholder="Cari deskripsi, ID, user…">
+    </span>
+    <select class="select" data-audit-action style="max-width:170px"><option value="">Semua aksi</option></select>
+    <select class="select" data-audit-module style="max-width:170px"><option value="">Semua modul</option></select>
+    <input class="input" type="date" data-audit-from style="max-width:150px" aria-label="Dari tanggal">
+    <span class="caption">s/d</span>
+    <input class="input" type="date" data-audit-to style="max-width:150px" aria-label="Sampai tanggal">
+    <div class="filterbar__actions">
+      <button class="btn btn--secondary btn--sm" data-audit-reset>Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <div><div class="card-title">Riwayat aktivitas</div>
+        <div class="caption" data-audit-count>—</div></div>
+    </div>
+    <div class="card__body card__body--flush"><div data-audit-table></div></div>
+    <div data-audit-pagination></div>
+  </div>
+</section>
+
+<script>
+definePage('audit', {
+  title: 'Audit Log',
+  breadcrumb: ['MR Dairy', 'Audit Log'],
+  permission: 'audit.view',
+
+  mount: function (ctx) {
+    ctx.root.__state = { page: 1, filters: {} };
+    var apply = function () {
+      ctx.root.__state.page = 1;
+      ctx.root.__state.filters = {
+        q: ctx.el('[data-audit-q]').value,
+        action: ctx.el('[data-audit-action]').value,
+        module: ctx.el('[data-audit-module]').value,
+        dateFrom: ctx.el('[data-audit-from]').value,
+        dateTo: ctx.el('[data-audit-to]').value
+      };
+      Audit.load(ctx);
+    };
+    ctx.el('[data-audit-q]').addEventListener('input', debounce(apply, 320));
+    ['[data-audit-action]', '[data-audit-module]', '[data-audit-from]', '[data-audit-to]'].forEach(function (sel) {
+      ctx.el(sel).addEventListener('change', apply);
+    });
+    ctx.el('[data-audit-reset]').addEventListener('click', function () {
+      ctx.el('[data-audit-q]').value = '';
+      ctx.el('[data-audit-action]').value = '';
+      ctx.el('[data-audit-module]').value = '';
+      ctx.el('[data-audit-from]').value = '';
+      ctx.el('[data-audit-to]').value = '';
+      apply();
+    });
+  },
+
+  load: function (ctx) { Audit.load(ctx); }
+});
+
+var Audit = {
+  load: function (ctx) {
+    var state = ctx.root.__state;
+    ctx.el('[data-audit-table]').innerHTML = UI.skeletonTable(10, 5);
+    Api.call('audit.list', { filters: state.filters, page: state.page, pageSize: 25 }).then(function (data) {
+      paint(function () {
+        ctx.el('[data-audit-count]').textContent = UI.fmt.number(data.meta.total) + ' aktivitas tercatat';
+
+        var actionSelect = ctx.el('[data-audit-action]');
+        if (actionSelect.options.length <= 1) {
+          actionSelect.innerHTML = '<option value="">Semua aksi</option>'
+            + data.options.actions.map(function (a) {
+              return '<option value="' + a + '">' + a.replace(/_/g, ' ') + '</option>';
+            }).join('');
+        }
+        var moduleSelect = ctx.el('[data-audit-module]');
+        if (moduleSelect.options.length <= 1) {
+          moduleSelect.innerHTML = '<option value="">Semua modul</option>'
+            + data.options.modules.map(function (m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
+        }
+
+        if (!data.rows.length) {
+          ctx.el('[data-audit-table]').innerHTML = UI.emptyState({
+            icon: 'history', title: 'Belum ada aktivitas',
+            desc: 'Setiap login, perubahan data, approval dan pembuatan SO akan tercatat di sini.'
+          });
+          ctx.el('[data-audit-pagination]').innerHTML = '';
+          return;
+        }
+
+        var toneOf = function (action) {
+          if (['APPROVE', 'CREATE_SO', 'CREATE'].indexOf(action) !== -1) return 'success';
+          if (['REJECT', 'DELETE', 'LOGIN_FAILED'].indexOf(action) !== -1) return 'danger';
+          if (['MANUAL_OVERRIDE', 'CHANGE_ALLOCATION', 'VALIDATE'].indexOf(action) !== -1) return 'warning';
+          if (['LOGIN', 'LOGOUT'].indexOf(action) !== -1) return 'info';
+          return 'muted';
+        };
+
+        ctx.el('[data-audit-table]').innerHTML = UI.table({
+          compact: true,
+          columns: [
+            {
+              key: 'TIMESTAMP', label: 'Waktu', render: function (r) {
+                return UI.fmt.dateTime(r.TIMESTAMP)
+                  + '<span class="table__cell-sub">' + UI.fmt.relative(r.TIMESTAMP) + '</span>';
+              }
+            },
+            { key: 'USER', label: 'User', render: function (r) { return '<span class="t-strong">' + UI.escapeHtml(r.USER) + '</span>'; } },
+            { key: 'ACTION', label: 'Aksi', align: 'center', render: function (r) { return UI.badge(r.ACTION.replace(/_/g, ' '), toneOf(r.ACTION)); } },
+            { key: 'MODULE', label: 'Modul', render: function (r) { return UI.escapeHtml(r.MODULE); } },
+            { key: 'RECORD_ID', label: 'Record', render: function (r) { return '<span class="mono">' + UI.escapeHtml(r.RECORD_ID || '—') + '</span>'; } },
+            { key: 'DESCRIPTION', label: 'Deskripsi', render: function (r) { return UI.escapeHtml(r.DESCRIPTION); } }
+          ],
+          rows: data.rows,
+          rowAttrs: function (row, index) { return 'style="cursor:pointer" data-audit-row="' + index + '"'; }
+        });
+        ctx.el('[data-audit-pagination]').innerHTML = UI.pagination(data.meta);
+
+        ctx.all('[data-audit-row]').forEach(function (tr) {
+          tr.addEventListener('click', function () {
+            var row = data.rows[Number(tr.getAttribute('data-audit-row'))];
+            Drawer.open({
+              title: row.ACTION.replace(/_/g, ' '),
+              sub: row.MODULE + ' · ' + UI.fmt.dateTime(row.TIMESTAMP),
+              body: '<div class="stack"><div class="panel"><div class="meta-grid">'
+                + UI.metaItem('User', UI.escapeHtml(row.USER))
+                + UI.metaItem('Record ID', '<span class="mono">' + UI.escapeHtml(row.RECORD_ID || '—') + '</span>')
+                + UI.metaItem('Log ID', '<span class="mono">' + UI.escapeHtml(row.LOG_ID) + '</span>')
+                + '</div></div>'
+                + '<div class="card"><div class="card__head"><div class="card-title">Deskripsi</div></div>'
+                + '<div class="card__body"><p style="font-size:13px;line-height:1.6">'
+                + UI.escapeHtml(row.DESCRIPTION) + '</p></div></div>'
+                + (row.OLD_VALUE || row.NEW_VALUE ? '<div class="grid grid--2" style="gap:12px">'
+                  + '<div class="card"><div class="card__head"><div class="card-title">Nilai lama</div></div>'
+                  + '<div class="card__body"><div class="mono" style="word-break:break-word">'
+                  + UI.escapeHtml(row.OLD_VALUE || '—') + '</div></div></div>'
+                  + '<div class="card"><div class="card__head"><div class="card-title">Nilai baru</div></div>'
+                  + '<div class="card__body"><div class="mono" style="word-break:break-word">'
+                  + UI.escapeHtml(row.NEW_VALUE || '—') + '</div></div></div></div>' : '')
+                + '</div>'
+            });
+          });
+        });
+        ctx.all('[data-audit-pagination] .page-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            ctx.root.__state.page = Number(btn.getAttribute('data-page'));
+            Audit.load(ctx);
+          });
+        });
+      });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat audit log');
+      ctx.el('[data-audit-table]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+    });
+  }
+};
+</script>

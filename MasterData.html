@@ -1,0 +1,431 @@
+<!-- =========================================================================
+     MasterData.html — Master Account, SKU dan User
+     ========================================================================= -->
+<section class="page" id="page-master">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Master Data</h1>
+      <p class="page-head__sub">Sumber kebenaran account, SKU dan pengguna aplikasi</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn--primary btn--sm" data-master="create" hidden>Tambah data</button>
+    </div>
+  </div>
+
+  <div class="tabs" data-master-tabs>
+    <button class="tab is-active" data-tab="accounts">Account</button>
+    <button class="tab" data-tab="skus">SKU</button>
+    <button class="tab" data-tab="users" data-requires="user.manage">User</button>
+  </div>
+
+  <div class="filterbar" style="margin-bottom:16px">
+    <span class="search-wrap" style="flex:1 1 240px;max-width:320px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input class="input input--search" type="search" data-master-search placeholder="Cari kode, nama…">
+    </span>
+    <select class="select" data-master-status style="max-width:150px">
+      <option value="">Semua status</option>
+      <option value="ACTIVE">Active</option>
+      <option value="INACTIVE">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <div><div class="card-title" data-master-title>Account</div>
+        <div class="caption" data-master-count>—</div></div>
+    </div>
+    <div class="card__body card__body--flush"><div data-master-table></div></div>
+    <div data-master-pagination></div>
+  </div>
+</section>
+
+<script>
+definePage('master', {
+  title: 'Master Data',
+  breadcrumb: ['MR Dairy', 'Master Data'],
+  permission: 'master.view',
+
+  mount: function (ctx) {
+    ctx.root.__state = { tab: 'accounts', page: 1, q: '', status: '' };
+    ctx.all('[data-master-tabs] .tab').forEach(function (tab) {
+      var requires = tab.getAttribute('data-requires');
+      if (requires && !App.can(requires)) tab.hidden = true;
+      tab.addEventListener('click', function () {
+        ctx.root.__state.tab = tab.getAttribute('data-tab');
+        ctx.root.__state.page = 1;
+        ctx.all('[data-master-tabs] .tab').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
+        Master.load(ctx);
+      });
+    });
+    ctx.el('[data-master-search]').addEventListener('input', debounce(function (event) {
+      ctx.root.__state.q = event.target.value;
+      ctx.root.__state.page = 1;
+      Master.load(ctx);
+    }, 320));
+    ctx.el('[data-master-status]').addEventListener('change', function (event) {
+      ctx.root.__state.status = event.target.value;
+      Master.load(ctx);
+    });
+    ctx.root.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-master]');
+      if (btn && btn.getAttribute('data-master') === 'create') Master.openForm(ctx, null);
+    });
+  },
+
+  load: function (ctx) {
+    var createBtn = ctx.el('[data-master="create"]');
+    createBtn.hidden = !(App.can('master.edit') || App.can('user.manage'));
+    Master.load(ctx);
+  }
+});
+
+var Master = {
+
+  load: function (ctx) {
+    var state = ctx.root.__state;
+    ctx.el('[data-master-table]').innerHTML = UI.skeletonTable(8, 5);
+    var titles = { accounts: 'Account', skus: 'SKU', users: 'User' };
+    ctx.el('[data-master-title]').textContent = titles[state.tab];
+    ctx.el('[data-master-status]').parentElement.hidden = state.tab === 'users';
+
+    var action = state.tab === 'accounts' ? 'master.accounts'
+      : (state.tab === 'skus' ? 'master.skus' : 'master.users');
+    Api.call(action, {
+      filters: { q: state.q, status: state.status }, page: state.page, pageSize: 25
+    }).then(function (data) {
+      ctx.root.__data = data;
+      paint(function () {
+        if (state.tab === 'accounts') Master.renderAccounts(ctx, data);
+        if (state.tab === 'skus') Master.renderSkus(ctx, data);
+        if (state.tab === 'users') Master.renderUsers(ctx, data);
+      });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat master data');
+      ctx.el('[data-master-table]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+    });
+  },
+
+  bindRows: function (ctx) {
+    ctx.all('[data-master-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var row = JSON.parse(btn.getAttribute('data-master-edit'));
+        Master.openForm(ctx, row);
+      });
+    });
+    ctx.all('[data-master-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var id = btn.getAttribute('data-master-toggle');
+        var action = ctx.root.__state.tab === 'accounts' ? 'master.toggleAccount' : 'master.toggleSku';
+        var payload = ctx.root.__state.tab === 'accounts' ? { accountId: id } : { skuId: id };
+        Api.call(action, payload).then(function (res) {
+          Toast.success('Status diperbarui', 'Status menjadi ' + res.status + '.');
+          Master.load(ctx);
+        }).catch(function (err) { Api.handle(err, 'Gagal mengubah status'); });
+      });
+    });
+    ctx.all('[data-master-pagination] .page-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        ctx.root.__state.page = Number(btn.getAttribute('data-page'));
+        Master.load(ctx);
+      });
+    });
+  },
+
+  actionCell: function (row, idField) {
+    if (!App.can('master.edit')) return '';
+    return '<div class="table__actions">'
+      + '<button class="btn btn--ghost btn--sm" data-master-edit=\''
+      + UI.escapeHtml(JSON.stringify(row)) + '\'>' + UI.icon('edit', 13) + '</button>'
+      + '<button class="btn btn--ghost btn--sm" data-master-toggle="' + UI.escapeHtml(row[idField])
+      + '" title="Aktif / nonaktif">' + UI.icon('refresh', 13) + '</button></div>';
+  },
+
+  renderAccounts: function (ctx, data) {
+    ctx.el('[data-master-count]').textContent = UI.fmt.number(data.meta.total) + ' account';
+    ctx.el('[data-master-table]').innerHTML = data.rows.length ? UI.table({
+      compact: true,
+      columns: [
+        {
+          key: 'ACCOUNT_CODE', label: 'Kode / Nama', render: function (r) {
+            return '<span class="mono">' + UI.escapeHtml(r.ACCOUNT_CODE) + '</span>'
+              + '<span class="table__cell-sub t-strong">' + UI.escapeHtml(r.ACCOUNT_NAME) + '</span>';
+          }
+        },
+        { key: 'CHANNEL', label: 'Channel', render: function (r) { return UI.fmt.label(r.CHANNEL); } },
+        {
+          key: 'REGION', label: 'Wilayah', render: function (r) {
+            return UI.escapeHtml(r.REGION) + '<span class="table__cell-sub">' + UI.escapeHtml(r.AREA) + '</span>';
+          }
+        },
+        { key: 'CLUSTER', label: 'Cluster', align: 'center', render: function (r) { return UI.statusBadge(r.CLUSTER, { potential: true }); } },
+        { key: 'POTENTIAL_LEVEL', label: 'Potensi', align: 'center', render: function (r) { return UI.statusBadge(r.POTENTIAL_LEVEL, { potential: true }); } },
+        { key: 'STATUS', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.STATUS); } },
+        { key: '_a', label: '', align: 'right', render: function (r) { return Master.actionCell(r, 'ACCOUNT_ID'); } }
+      ],
+      rows: data.rows
+    }) : UI.emptyState({ icon: 'database', title: 'Belum ada account', desc: 'Tambahkan account atau jalankan demo data.' });
+    ctx.el('[data-master-pagination]').innerHTML = UI.pagination(data.meta);
+    Master.bindRows(ctx);
+  },
+
+  renderSkus: function (ctx, data) {
+    ctx.el('[data-master-count]').textContent = UI.fmt.number(data.meta.total) + ' SKU';
+    ctx.el('[data-master-table]').innerHTML = data.rows.length ? UI.table({
+      compact: true,
+      columns: [
+        {
+          key: 'SKU_CODE', label: 'Kode / Nama', render: function (r) {
+            return '<span class="mono">' + UI.escapeHtml(r.SKU_CODE) + '</span>'
+              + '<span class="table__cell-sub t-strong">' + UI.escapeHtml(r.SKU_NAME) + '</span>';
+          }
+        },
+        { key: 'CATEGORY', label: 'Kategori', render: function (r) { return UI.fmt.label(r.CATEGORY); } },
+        { key: 'BRAND', label: 'Brand', render: function (r) { return UI.escapeHtml(r.BRAND); } },
+        { key: 'UNIT', label: 'Unit', align: 'center', render: function (r) { return UI.escapeHtml(r.UNIT); } },
+        {
+          key: 'SHELF_LIFE_DAYS', label: 'Shelf life', align: 'right', render: function (r) {
+            var days = Number(r.SHELF_LIFE_DAYS);
+            return UI.fmt.number(days) + ' hari'
+              + (days <= 45 ? '<span class="table__cell-sub text-warning">fast perishable</span>' : '');
+          }
+        },
+        { key: 'STATUS', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.STATUS); } },
+        { key: '_a', label: '', align: 'right', render: function (r) { return Master.actionCell(r, 'SKU_ID'); } }
+      ],
+      rows: data.rows
+    }) : UI.emptyState({ icon: 'package', title: 'Belum ada SKU', desc: 'Tambahkan SKU atau jalankan demo data.' });
+    ctx.el('[data-master-pagination]').innerHTML = UI.pagination(data.meta);
+    Master.bindRows(ctx);
+  },
+
+  renderUsers: function (ctx, data) {
+    ctx.el('[data-master-count]').textContent = data.rows.length + ' user terdaftar';
+    ctx.el('[data-master-table]').innerHTML = UI.table({
+      compact: true,
+      columns: [
+        {
+          key: 'USERNAME', label: 'Username / Nama', render: function (r) {
+            return '<span class="t-strong">' + UI.escapeHtml(r.USERNAME) + '</span>'
+              + '<span class="table__cell-sub">' + UI.escapeHtml(r.NAME) + '</span>';
+          }
+        },
+        { key: 'ROLE', label: 'Role', align: 'center', render: function (r) { return UI.badge(r.ROLE, 'info'); } },
+        { key: 'EMAIL', label: 'Email', render: function (r) { return UI.escapeHtml(r.EMAIL || '—'); } },
+        { key: 'STATUS', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.STATUS); } },
+        {
+          key: 'UPDATED_AT', label: 'Diperbarui', render: function (r) { return UI.fmt.date(r.UPDATED_AT); }
+        },
+        {
+          key: '_a', label: '', align: 'right', render: function (r) {
+            if (!App.can('user.manage')) return '';
+            return '<div class="table__actions"><button class="btn btn--ghost btn--sm" data-master-edit=\''
+              + UI.escapeHtml(JSON.stringify(r)) + '\'>' + UI.icon('edit', 13) + '</button></div>';
+          }
+        }
+      ],
+      rows: data.rows
+    });
+    ctx.el('[data-master-pagination]').innerHTML = '';
+    Master.bindRows(ctx);
+  },
+
+  openForm: function (ctx, row) {
+    var tab = ctx.root.__state.tab;
+    if (tab === 'accounts') Master.openAccountForm(ctx, row);
+    if (tab === 'skus') Master.openSkuForm(ctx, row);
+    if (tab === 'users') Master.openUserForm(ctx, row);
+  },
+
+  openAccountForm: function (ctx, row) {
+    var master = App.state.master || {};
+    var af = master.accountFilters || {};
+    var value = function (key) { return row ? UI.escapeHtml(row[key]) : ''; };
+    var select = function (id, options, selected, placeholder) {
+      return '<select class="select" id="' + id + '"><option value="">' + placeholder + '</option>'
+        + options.map(function (o) {
+          return '<option value="' + UI.escapeHtml(o) + '"' + (selected === o ? ' selected' : '') + '>'
+            + UI.escapeHtml(String(o).replace(/_/g, ' ')) + '</option>';
+        }).join('') + '</select>';
+    };
+    Modal.open({
+      large: true,
+      title: row ? 'Ubah account' : 'Tambah account',
+      sub: row ? row.ACCOUNT_ID : 'Account baru akan langsung tersedia pada modul lain',
+      body: '<div class="stack">'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Account Code <span class="text-danger">*</span></label>'
+        + '<input class="input" id="acc-code" value="' + value('ACCOUNT_CODE') + '"></div>'
+        + '<div class="field"><label class="field__label">Account Name <span class="text-danger">*</span></label>'
+        + '<input class="input" id="acc-name" value="' + value('ACCOUNT_NAME') + '"></div></div>'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Channel</label>'
+        + select('acc-channel', ['MODERN_TRADE', 'GENERAL_TRADE', 'HORECA', 'E_COMMERCE'], row ? row.CHANNEL : '', 'Pilih channel') + '</div>'
+        + '<div class="field"><label class="field__label">Region</label>'
+        + '<input class="input" id="acc-region" list="acc-region-list" value="' + value('REGION') + '">'
+        + '<datalist id="acc-region-list">' + (af.regions || []).map(function (r) {
+          return '<option value="' + UI.escapeHtml(r) + '">';
+        }).join('') + '</datalist></div>'
+        + '<div class="field"><label class="field__label">Area</label>'
+        + '<input class="input" id="acc-area" value="' + value('AREA') + '"></div>'
+        + '<div class="field"><label class="field__label">Kota</label>'
+        + '<input class="input" id="acc-city" value="' + value('CITY') + '"></div></div>'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Potential Level</label>'
+        + select('acc-potential', ['HIGH', 'MEDIUM', 'LOW'], row ? row.POTENTIAL_LEVEL : 'MEDIUM', 'Pilih potensi')
+        + '<span class="field__hint">Dipakai sebagai faktor pengali pada formula allocation.</span></div>'
+        + '<div class="field"><label class="field__label">Cluster</label>'
+        + select('acc-cluster', ['HIGH', 'MEDIUM', 'LOW'], row ? row.CLUSTER : 'MEDIUM', 'Pilih cluster') + '</div>'
+        + '<div class="field"><label class="field__label">Status</label>'
+        + select('acc-status', ['ACTIVE', 'INACTIVE'], row ? row.STATUS : 'ACTIVE', 'Pilih status') + '</div></div>'
+        + '<div id="acc-error"></div></div>',
+      actions: [
+        { label: 'Batal', tone: 'secondary' },
+        {
+          label: 'Simpan', tone: 'primary', close: false,
+          onClick: function (body) {
+            var payload = {
+              ACCOUNT_ID: row ? row.ACCOUNT_ID : '',
+              ACCOUNT_CODE: qs('#acc-code', body).value,
+              ACCOUNT_NAME: qs('#acc-name', body).value,
+              CHANNEL: qs('#acc-channel', body).value,
+              REGION: qs('#acc-region', body).value,
+              AREA: qs('#acc-area', body).value,
+              CITY: qs('#acc-city', body).value,
+              POTENTIAL_LEVEL: qs('#acc-potential', body).value,
+              CLUSTER: qs('#acc-cluster', body).value,
+              STATUS: qs('#acc-status', body).value
+            };
+            Api.call('master.saveAccount', payload).then(function () {
+              Modal.close();
+              Toast.success('Account tersimpan');
+              Master.load(ctx);
+            }).catch(function (err) {
+              qs('#acc-error', body).innerHTML = UI.alert('danger', 'Tidak dapat disimpan', err.message);
+            });
+            return false;
+          }
+        }
+      ]
+    });
+  },
+
+  openSkuForm: function (ctx, row) {
+    var value = function (key) { return row ? UI.escapeHtml(row[key]) : ''; };
+    Modal.open({
+      title: row ? 'Ubah SKU' : 'Tambah SKU',
+      sub: row ? row.SKU_ID : 'SKU baru',
+      body: '<div class="stack">'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">SKU Code <span class="text-danger">*</span></label>'
+        + '<input class="input" id="sku-code" value="' + value('SKU_CODE') + '"></div>'
+        + '<div class="field"><label class="field__label">SKU Name <span class="text-danger">*</span></label>'
+        + '<input class="input" id="sku-name" value="' + value('SKU_NAME') + '"></div></div>'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Kategori</label>'
+        + '<input class="input" id="sku-category" value="' + value('CATEGORY') + '"></div>'
+        + '<div class="field"><label class="field__label">Brand</label>'
+        + '<input class="input" id="sku-brand" value="' + value('BRAND') + '"></div></div>'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Unit</label>'
+        + '<input class="input" id="sku-unit" value="' + (row ? value('UNIT') : 'CTN') + '"></div>'
+        + '<div class="field"><label class="field__label">Shelf life (hari)</label>'
+        + '<input class="input" type="number" min="0" id="sku-shelf" value="' + (row ? row.SHELF_LIFE_DAYS : 90) + '">'
+        + '<span class="field__hint">Semakin pendek, semakin tinggi bobot risiko MR.</span></div>'
+        + '<div class="field"><label class="field__label">Status</label>'
+        + '<select class="select" id="sku-status">'
+        + ['ACTIVE', 'INACTIVE'].map(function (s) {
+          return '<option value="' + s + '"' + (row && row.STATUS === s ? ' selected' : '') + '>' + s + '</option>';
+        }).join('') + '</select></div></div>'
+        + '<div id="sku-error"></div></div>',
+      actions: [
+        { label: 'Batal', tone: 'secondary' },
+        {
+          label: 'Simpan', tone: 'primary', close: false,
+          onClick: function (body) {
+            Api.call('master.saveSku', {
+              SKU_ID: row ? row.SKU_ID : '',
+              SKU_CODE: qs('#sku-code', body).value,
+              SKU_NAME: qs('#sku-name', body).value,
+              CATEGORY: qs('#sku-category', body).value,
+              BRAND: qs('#sku-brand', body).value,
+              UNIT: qs('#sku-unit', body).value,
+              SHELF_LIFE_DAYS: qs('#sku-shelf', body).value,
+              STATUS: qs('#sku-status', body).value
+            }).then(function () {
+              Modal.close();
+              Toast.success('SKU tersimpan');
+              Master.load(ctx);
+            }).catch(function (err) {
+              qs('#sku-error', body).innerHTML = UI.alert('danger', 'Tidak dapat disimpan', err.message);
+            });
+            return false;
+          }
+        }
+      ]
+    });
+  },
+
+  openUserForm: function (ctx, row) {
+    var roles = (ctx.root.__data && ctx.root.__data.roles) || ['ADMIN', 'MANAGER', 'SALES', 'MR', 'VIEWER'];
+    Modal.open({
+      title: row ? 'Ubah user' : 'Tambah user',
+      sub: row ? row.USER_ID : 'Akses aplikasi diatur melalui role',
+      body: '<div class="stack">'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Username <span class="text-danger">*</span></label>'
+        + '<input class="input" id="usr-username" value="' + (row ? UI.escapeHtml(row.USERNAME) : '') + '"></div>'
+        + '<div class="field"><label class="field__label">Nama <span class="text-danger">*</span></label>'
+        + '<input class="input" id="usr-name" value="' + (row ? UI.escapeHtml(row.NAME) : '') + '"></div></div>'
+        + '<div class="field-row">'
+        + '<div class="field"><label class="field__label">Role</label>'
+        + '<select class="select" id="usr-role">' + roles.map(function (r) {
+          return '<option value="' + r + '"' + (row && row.ROLE === r ? ' selected' : '') + '>' + r + '</option>';
+        }).join('') + '</select></div>'
+        + '<div class="field"><label class="field__label">Email</label>'
+        + '<input class="input" id="usr-email" value="' + (row ? UI.escapeHtml(row.EMAIL || '') : '') + '"></div>'
+        + '<div class="field"><label class="field__label">Status</label>'
+        + '<select class="select" id="usr-status">'
+        + ['ACTIVE', 'INACTIVE'].map(function (s) {
+          return '<option value="' + s + '"' + (row && row.STATUS === s ? ' selected' : '') + '>' + s + '</option>';
+        }).join('') + '</select></div></div>'
+        + '<div class="field"><label class="field__label">Password'
+        + (row ? '' : ' <span class="text-danger">*</span>') + '</label>'
+        + '<input class="input" type="password" id="usr-password" placeholder="'
+        + (row ? 'Kosongkan bila tidak diubah' : 'Minimal 6 karakter') + '"></div>'
+        + UI.alert('warning', 'Keamanan',
+          'Password disimpan sebagai hash SHA-256 dengan salt. Ganti seluruh password default sebelum dipakai produksi.')
+        + '<div id="usr-error"></div></div>',
+      actions: [
+        { label: 'Batal', tone: 'secondary' },
+        {
+          label: 'Simpan', tone: 'primary', close: false,
+          onClick: function (body) {
+            Api.call('master.saveUser', {
+              USER_ID: row ? row.USER_ID : '',
+              USERNAME: qs('#usr-username', body).value,
+              NAME: qs('#usr-name', body).value,
+              ROLE: qs('#usr-role', body).value,
+              EMAIL: qs('#usr-email', body).value,
+              STATUS: qs('#usr-status', body).value,
+              PASSWORD: qs('#usr-password', body).value
+            }).then(function () {
+              Modal.close();
+              Toast.success('User tersimpan');
+              Master.load(ctx);
+            }).catch(function (err) {
+              qs('#usr-error', body).innerHTML = UI.alert('danger', 'Tidak dapat disimpan', err.message);
+            });
+            return false;
+          }
+        }
+      ]
+    });
+  }
+};
+</script>

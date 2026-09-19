@@ -1,0 +1,115 @@
+<!-- =========================================================================
+     Login.html — Halaman autentikasi
+     ========================================================================= -->
+<div id="login-screen" class="auth" hidden>
+
+  <aside class="auth__aside">
+    <div style="position:relative;z-index:1">
+      <div class="auth__brand">
+        <div class="sidebar__logo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2h8l-1 4v2l3 8a4 4 0 0 1-4 5h-4a4 4 0 0 1-4-5l3-8V6z"></path>
+          </svg>
+        </div>
+        <div>
+          <div style="color:#fff;font-size:13px;font-weight:650;letter-spacing:-.01em">PROJECT MR DAIRY</div>
+          <div style="color:rgba(255,255,255,.45);font-size:11px">Distribution Planning &amp; MR Management</div>
+        </div>
+      </div>
+
+      <h1 class="auth__headline" style="margin-top:56px">
+        Less Return.<br>More Freshness.
+      </h1>
+      <p class="auth__lead">
+        Satu ruang kerja untuk merencanakan allocation berbasis data dan menjalankan
+        administrasi Market Return sesuai SOP — dari input sampai SO otomatis.
+      </p>
+
+      <div class="auth__points">
+        <div class="auth__point">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Allocation dihitung dari sell out, return, stock dan potensi account</span>
+        </div>
+        <div class="auth__point">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Clustering account &amp; indikator risiko Market Return per SKU</span>
+        </div>
+        <div class="auth__point">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Workflow MR: input, validasi, approval Sales, create SO, monitoring</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth__foot">
+      <span id="auth-version">v1.0.0</span> · Google Apps Script · Google Sheets Database
+    </div>
+  </aside>
+
+  <section class="auth__panel">
+    <form class="auth__form" id="login-form" autocomplete="on" novalidate>
+      <h2 class="auth__title">Masuk ke aplikasi</h2>
+      <p class="auth__sub">Gunakan akun yang diberikan administrator.</p>
+
+      <div class="stack">
+        <div class="field" id="field-username">
+          <label class="field__label" for="login-username">Username</label>
+          <input class="input" id="login-username" name="username" type="text"
+                 placeholder="mis. admin" autocomplete="username" required>
+        </div>
+
+        <div class="field" id="field-password">
+          <label class="field__label" for="login-password">Password</label>
+          <div style="position:relative">
+            <input class="input" id="login-password" name="password" type="password"
+                   placeholder="Masukkan password" autocomplete="current-password" required
+                   style="padding-right:38px">
+            <button type="button" class="icon-btn" id="toggle-password" aria-label="Tampilkan password"
+                    style="position:absolute;right:3px;top:3px;width:30px;height:30px;border:0;background:transparent">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="login-error" class="alert alert--danger" hidden>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px">
+            <circle cx="12" cy="12" r="10"></circle><path d="M12 8v4M12 16h.01"></path>
+          </svg>
+          <div><span id="login-error-text"></span></div>
+        </div>
+
+        <button class="btn btn--primary btn--block" id="login-submit" type="submit" style="height:40px">
+          <span id="login-submit-label">Masuk</span>
+        </button>
+      </div>
+
+      <div class="auth__demo">
+        <div class="row row--between">
+          <span class="overline">Akun demo</span>
+          <span class="caption">klik untuk mengisi otomatis</span>
+        </div>
+        <div class="demo-accounts" id="demo-accounts">
+          <button type="button" class="demo-account" data-u="admin" data-p="admin123">
+            <b>admin</b><span>Full access</span></button>
+          <button type="button" class="demo-account" data-u="manager" data-p="manager123">
+            <b>manager</b><span>Planning &amp; approval</span></button>
+          <button type="button" class="demo-account" data-u="sales" data-p="sales123">
+            <b>sales</b><span>Approval MR</span></button>
+          <button type="button" class="demo-account" data-u="mr" data-p="mr123">
+            <b>mr</b><span>Input &amp; monitoring</span></button>
+        </div>
+        <p class="caption" style="margin-top:12px">
+          Untuk produksi, ganti seluruh password default melalui menu Settings.
+        </p>
+      </div>
+    </form>
+  </section>
+</div>

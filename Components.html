@@ -1,0 +1,706 @@
+<!-- =========================================================================
+     Components.html — Icon sprite, UI atoms, dan chart engine (SVG murni).
+     Tidak memakai library chart eksternal agar ringan dan konsisten dengan
+     design system.
+     ========================================================================= -->
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="i-grid"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></g>
+    <g id="i-target"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.4"></circle></g>
+    <g id="i-clipboard"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M9 13h6M9 17h4"></path></g>
+    <g id="i-book"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></g>
+    <g id="i-kanban"><rect x="3" y="3" width="5.5" height="14" rx="1.5"></rect><rect x="10" y="3" width="5.5" height="10" rx="1.5"></rect><rect x="17" y="3" width="4" height="17" rx="1.5"></rect></g>
+    <g id="i-chart"><path d="M3 3v18h18"></path><path d="M7 15l3.5-4 3 2.5L20 7"></path></g>
+    <g id="i-database"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></g>
+    <g id="i-history"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path><path d="M12 7v5l3 2"></path></g>
+    <g id="i-settings"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></g>
+    <g id="i-plus"><path d="M12 5v14M5 12h14"></path></g>
+    <g id="i-filter"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></g>
+    <g id="i-search"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></g>
+    <g id="i-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><path d="M12 15V3"></path></g>
+    <g id="i-check"><polyline points="20 6 9 17 4 12"></polyline></g>
+    <g id="i-x"><path d="M18 6 6 18M6 6l12 12"></path></g>
+    <g id="i-alert"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4M12 17h.01"></path></g>
+    <g id="i-info"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></g>
+    <g id="i-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></g>
+    <g id="i-chevron-left"><polyline points="15 18 9 12 15 6"></polyline></g>
+    <g id="i-chevron-down"><polyline points="6 9 12 15 18 9"></polyline></g>
+    <g id="i-arrow-up"><path d="M12 19V5M5 12l7-7 7 7"></path></g>
+    <g id="i-arrow-down"><path d="M12 5v14M19 12l-7 7-7-7"></path></g>
+    <g id="i-arrow-right"><path d="M5 12h14M12 5l7 7-7 7"></path></g>
+    <g id="i-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"></path></g>
+    <g id="i-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></g>
+    <g id="i-calendar"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></g>
+    <g id="i-package"><path d="m7.5 4.3 9 5.2"></path><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><path d="m3.3 7 8.7 5 8.7-5M12 22V12"></path></g>
+    <g id="i-truck"><path d="M10 17h4V5H2v12h3"></path><path d="M20 17h2v-3.3a2 2 0 0 0-.6-1.4L19 10h-5v7h3"></path><circle cx="7.5" cy="17.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></g>
+    <g id="i-file"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M16 13H8M16 17H8M10 9H8"></path></g>
+    <g id="i-refresh"><path d="M21 2v6h-6M3 22v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.9-3.4L21 8M21 15a9 9 0 0 1-14.9 3.4L3 16"></path></g>
+    <g id="i-user"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></g>
+    <g id="i-logout"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><path d="M21 12H9"></path></g>
+    <g id="i-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></g>
+    <g id="i-trending-up"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></g>
+    <g id="i-trending-down"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></g>
+    <g id="i-layers"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></g>
+    <g id="i-zap"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></g>
+    <g id="i-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></g>
+    <g id="i-inbox"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></g>
+    <g id="i-more"><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></g>
+    <g id="i-external"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><path d="M10 14 21 3"></path></g>
+    <g id="i-save"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></g>
+  </defs>
+</svg>
+
+<script>
+/* =========================================================================
+   UI — helper render (string HTML) + formatter
+   ========================================================================= */
+var UI = (function () {
+
+  var TONE_BY_STATUS = {
+    // MR workflow
+    INPUT: 'muted', VALIDATED: 'info', WAITING_APPROVAL: 'warning', APPROVED: 'success',
+    SO_CREATED: 'purple', PICKUP_SCHEDULED: 'info', COMPLETED: 'success', REJECTED: 'danger',
+    // Allocation plan
+    DRAFT: 'muted', SUBMITTED: 'info', NOT_PLANNED: 'muted',
+    // Risk & potential
+    HIGH: 'danger', MEDIUM: 'warning', LOW: 'success',
+    // Validation
+    PASS: 'success', WARNING: 'warning', ERROR: 'danger', NOT_VALIDATED: 'muted',
+    // SLA & komitmen
+    ON_TIME: 'success', ON_TRACK: 'success', DUE_SOON: 'warning', OVERDUE: 'danger',
+    FULFILLED: 'success', NO_CUTOFF: 'muted',
+    // Umum
+    ACTIVE: 'success', INACTIVE: 'muted', PENDING: 'warning', RECEIVED: 'success',
+    NOT_REQUIRED: 'muted', CREATED: 'success', NOT_CREATED: 'muted', CANCELLED: 'muted',
+    PROCESSED: 'success', OPEN: 'info'
+  };
+
+  var POTENTIAL_TONE = { HIGH: 'success', MEDIUM: 'info', LOW: 'muted' };
+
+  function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function icon(name, size, cls) {
+    var s = size || 16;
+    return '<svg class="' + (cls || '') + '" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" '
+      + 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+      + 'stroke-linejoin="round" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
+  }
+
+  // ---- Formatter ---------------------------------------------------------
+  var fmt = {
+    number: function (value, decimals) {
+      var n = Number(value);
+      if (!isFinite(n)) return '—';
+      return n.toLocaleString('id-ID', {
+        minimumFractionDigits: decimals || 0, maximumFractionDigits: decimals === undefined ? 0 : decimals
+      });
+    },
+    decimal: function (value, decimals) {
+      var n = Number(value);
+      if (!isFinite(n)) return '—';
+      var d = decimals === undefined ? 1 : decimals;
+      return n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+    },
+    percent: function (value, decimals) {
+      var n = Number(value);
+      if (!isFinite(n)) return '—';
+      var d = decimals === undefined ? 2 : decimals;
+      return n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
+    },
+    currency: function (value) {
+      var n = Number(value) || 0;
+      return (window.App && App.state.app.currencySymbol ? App.state.app.currencySymbol : 'Rp')
+        + ' ' + n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    },
+    compact: function (value) {
+      var n = Number(value) || 0;
+      var abs = Math.abs(n);
+      if (abs >= 1e12) return (n / 1e12).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' T';
+      if (abs >= 1e9) return (n / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' M';
+      if (abs >= 1e6) return (n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' jt';
+      if (abs >= 1e3) return (n / 1e3).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' rb';
+      return n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    },
+    compactCurrency: function (value) {
+      var symbol = (window.App && App.state.app.currencySymbol) ? App.state.app.currencySymbol : 'Rp';
+      return symbol + ' ' + fmt.compact(value);
+    },
+    date: function (value) {
+      if (!value) return '—';
+      var parts = String(value).substring(0, 10).split('-');
+      if (parts.length !== 3) return escapeHtml(value);
+      var months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return parts[2] + ' ' + (months[Number(parts[1]) - 1] || parts[1]) + ' ' + parts[0];
+    },
+    dateTime: function (value) {
+      if (!value) return '—';
+      var str = String(value);
+      return fmt.date(str.substring(0, 10)) + (str.length > 10 ? ' · ' + str.substring(11, 16) : '');
+    },
+    relative: function (value) {
+      if (!value) return '—';
+      var then = new Date(String(value).replace(' ', 'T'));
+      if (isNaN(then.getTime())) return fmt.dateTime(value);
+      var diff = (Date.now() - then.getTime()) / 1000;
+      if (diff < 60) return 'baru saja';
+      if (diff < 3600) return Math.floor(diff / 60) + ' menit lalu';
+      if (diff < 86400) return Math.floor(diff / 3600) + ' jam lalu';
+      if (diff < 604800) return Math.floor(diff / 86400) + ' hari lalu';
+      return fmt.date(value);
+    },
+    qty: function (value, unit) {
+      return fmt.number(value) + (unit ? ' <span class="text-muted" style="font-weight:400">' + escapeHtml(unit) + '</span>' : '');
+    },
+    label: function (value) {
+      return escapeHtml(String(value || '').replace(/_/g, ' '));
+    }
+  };
+
+  // ---- Atoms -------------------------------------------------------------
+  function badge(text, tone, plain) {
+    return '<span class="badge badge--' + (tone || 'muted') + (plain ? ' badge--plain' : '') + '">'
+      + escapeHtml(text) + '</span>';
+  }
+
+  function statusBadge(status, options) {
+    var key = String(status || '').toUpperCase();
+    var opts = options || {};
+    var tone = opts.tone || (opts.potential ? POTENTIAL_TONE[key] : TONE_BY_STATUS[key]) || 'muted';
+    return badge(opts.label || key.replace(/_/g, ' '), tone, opts.plain);
+  }
+
+  function riskBadge(level, score) {
+    var tone = TONE_BY_STATUS[String(level || '').toUpperCase()] || 'muted';
+    return '<span class="badge badge--' + tone + '" title="Risk score ' + (score || 0) + '/100">'
+      + escapeHtml(String(level || '').replace(/_/g, ' ')) + '</span>';
+  }
+
+  function delta(config) {
+    var d = config.delta;
+    if (d === null || d === undefined) {
+      return '<span class="delta delta--flat">—</span>';
+    }
+    var good = config.good;
+    var cls = good === null || good === undefined ? 'flat' : (good ? 'good' : 'bad');
+    var arrow = d > 0 ? 'arrow-up' : (d < 0 ? 'arrow-down' : 'check');
+    return '<span class="delta delta--' + cls + '">' + icon(arrow, 11)
+      + Math.abs(Number(d)).toLocaleString('id-ID', { maximumFractionDigits: 2 })
+      + (config.suffix || '%') + '</span>';
+  }
+
+  /**
+   * KPI card.
+   * config: {label, value, unit, sub, delta, good, iconName, accent, onClick, format}
+   */
+  function kpiCard(config) {
+    var valueHtml = config.valueHtml || escapeHtml(config.value);
+    var parts = [];
+    parts.push('<div class="kpi' + (config.accent ? ' kpi--accent' : '')
+      + (config.action ? ' kpi--clickable' : '') + '"'
+      + (config.action ? ' data-kpi-action="' + escapeHtml(config.action) + '" role="button" tabindex="0"' : '') + '>');
+    parts.push('<div class="kpi__top"><span class="kpi__label">' + escapeHtml(config.label) + '</span>');
+    if (config.iconName) parts.push('<span class="kpi__icon">' + icon(config.iconName, 15) + '</span>');
+    parts.push('</div>');
+    parts.push('<div class="kpi__value num">' + valueHtml
+      + (config.unit ? '<small>' + escapeHtml(config.unit) + '</small>' : '') + '</div>');
+    parts.push('<div class="kpi__foot">');
+    if (config.delta !== undefined && config.delta !== null) parts.push(delta(config));
+    if (config.sub) parts.push('<span class="kpi__sub">' + config.sub + '</span>');
+    parts.push('</div></div>');
+    return parts.join('');
+  }
+
+  function emptyState(config) {
+    var c = config || {};
+    return '<div class="empty">'
+      + '<div class="empty__icon">' + icon(c.icon || 'inbox', 22) + '</div>'
+      + '<div class="empty__title">' + escapeHtml(c.title || 'Belum ada data') + '</div>'
+      + '<div class="empty__desc">' + escapeHtml(c.desc || '') + '</div>'
+      + (c.actionLabel ? '<button class="btn btn--primary btn--sm" data-empty-action="'
+        + escapeHtml(c.action || '') + '">' + escapeHtml(c.actionLabel) + '</button>' : '')
+      + '</div>';
+  }
+
+  function alert(tone, title, message) {
+    var iconName = tone === 'success' ? 'check' : (tone === 'danger' ? 'alert' : (tone === 'warning' ? 'alert' : 'info'));
+    return '<div class="alert alert--' + tone + '">' + icon(iconName, 15)
+      + '<div>' + (title ? '<div class="alert__title">' + escapeHtml(title) + '</div>' : '')
+      + escapeHtml(message) + '</div></div>';
+  }
+
+  // ---- Skeleton ----------------------------------------------------------
+  function skeletonKpi(count) {
+    var out = [];
+    for (var i = 0; i < (count || 4); i++) {
+      out.push('<div class="sk-kpi"><div class="sk sk--text" style="width:45%"></div>'
+        + '<div class="sk sk--value" style="margin-top:14px"></div>'
+        + '<div class="sk sk--text" style="width:60%;margin-top:12px"></div></div>');
+    }
+    return out.join('');
+  }
+
+  function skeletonTable(rows, cols) {
+    var out = [];
+    for (var r = 0; r < (rows || 6); r++) {
+      var cells = [];
+      for (var c = 0; c < (cols || 5); c++) {
+        cells.push('<div><div class="sk sk--line" style="width:' + (c === 0 ? 70 : 45 + (c * 7) % 40) + '%"></div></div>');
+      }
+      out.push('<div class="sk-row">' + cells.join('') + '</div>');
+    }
+    return out.join('');
+  }
+
+  function skeletonChart(height) {
+    return '<div class="sk sk--chart" style="height:' + (height || 210) + 'px"></div>';
+  }
+
+  // ---- Table -------------------------------------------------------------
+  /**
+   * columns: [{key, label, align, width, sortable, render(row), className}]
+   */
+  function table(config) {
+    var cols = config.columns || [];
+    var rows = config.rows || [];
+    var head = cols.map(function (col) {
+      var align = col.align === 'right' ? ' style="text-align:right"' : (col.align === 'center' ? ' style="text-align:center"' : '');
+      var sortable = col.sortable ? ' class="is-sortable" data-sort-key="' + escapeHtml(col.sortKey || col.key) + '"' : '';
+      var indicator = '';
+      if (col.sortable && config.sortKey === (col.sortKey || col.key)) {
+        indicator = '<span class="sort-ind">' + (config.sortDir === 'asc' ? '&uarr;' : '&darr;') + '</span>';
+      }
+      return '<th' + sortable + align + '>' + escapeHtml(col.label) + indicator + '</th>';
+    }).join('');
+
+    var body = rows.map(function (row, index) {
+      var cells = cols.map(function (col) {
+        var align = col.align === 'right' ? ' t-right' : (col.align === 'center' ? ' t-center' : '');
+        var content = col.render ? col.render(row, index) : escapeHtml(row[col.key]);
+        return '<td class="' + (col.className || '') + align + '">' + content + '</td>';
+      }).join('');
+      var attrs = config.rowAttrs ? config.rowAttrs(row, index) : '';
+      return '<tr ' + attrs + '>' + cells + '</tr>';
+    }).join('');
+
+    return '<div class="table-wrap"><table class="table' + (config.compact ? ' table--compact' : '') + '">'
+      + '<thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
+
+  function pagination(meta, options) {
+    if (!meta) return '';
+    var opts = options || {};
+    var pages = [];
+    var total = meta.totalPages || 1;
+    var current = meta.page || 1;
+    var start = Math.max(1, current - 2);
+    var end = Math.min(total, start + 4);
+    start = Math.max(1, end - 4);
+
+    pages.push('<button class="page-btn" data-page="' + (current - 1) + '"'
+      + (current <= 1 ? ' disabled' : '') + ' aria-label="Sebelumnya">' + icon('chevron-left', 13) + '</button>');
+    for (var p = start; p <= end; p++) {
+      pages.push('<button class="page-btn' + (p === current ? ' is-active' : '') + '" data-page="' + p + '">' + p + '</button>');
+    }
+    pages.push('<button class="page-btn" data-page="' + (current + 1) + '"'
+      + (current >= total ? ' disabled' : '') + ' aria-label="Berikutnya">' + icon('chevron-right', 13) + '</button>');
+
+    return '<div class="pagination"><div class="pagination__info">Menampilkan '
+      + fmt.number(meta.from) + '–' + fmt.number(meta.to) + ' dari ' + fmt.number(meta.total) + ' baris'
+      + (opts.label ? ' ' + escapeHtml(opts.label) : '') + '</div>'
+      + '<div class="pagination__controls">' + pages.join('') + '</div></div>';
+  }
+
+  function progressTracker(steps, currentIndex) {
+    return '<div class="tracker">' + steps.map(function (step, idx) {
+      var cls = idx < currentIndex ? 'is-done' : (idx === currentIndex ? 'is-current' : '');
+      var inner = idx < currentIndex ? icon('check', 12) : String(idx + 1);
+      return '<div class="tracker__step ' + cls + '"><div class="tracker__dot">' + inner + '</div>'
+        + '<div class="tracker__label">' + escapeHtml(step) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  function metaItem(label, value) {
+    return '<div class="meta-item"><div class="meta-item__label">' + escapeHtml(label) + '</div>'
+      + '<div class="meta-item__value">' + value + '</div></div>';
+  }
+
+  function miniBar(percent, tone) {
+    var colors = { success: 'var(--green-500)', warning: 'var(--amber-500)', danger: 'var(--red-500)', primary: 'var(--petrol-500)' };
+    return '<div class="bar-mini"><div class="bar-mini__fill" style="width:'
+      + Math.max(0, Math.min(100, percent)) + '%;background:' + (colors[tone] || colors.primary) + '"></div></div>';
+  }
+
+  function checkItem(item) {
+    var status = String(item.status || 'PASS').toLowerCase();
+    var iconName = status === 'pass' ? 'check' : (status === 'warning' ? 'alert' : 'x');
+    return '<div class="check-item">'
+      + '<span class="check-item__icon check-item__icon--' + status + '">' + icon(iconName, 11) + '</span>'
+      + '<div><div class="check-item__label">' + escapeHtml(item.label) + '</div>'
+      + (item.message ? '<div class="check-item__msg">' + escapeHtml(item.message) + '</div>' : '') + '</div></div>';
+  }
+
+  return {
+    escapeHtml: escapeHtml, icon: icon, fmt: fmt, badge: badge, statusBadge: statusBadge,
+    riskBadge: riskBadge, delta: delta, kpiCard: kpiCard, emptyState: emptyState, alert: alert,
+    skeletonKpi: skeletonKpi, skeletonTable: skeletonTable, skeletonChart: skeletonChart,
+    table: table, pagination: pagination, progressTracker: progressTracker, metaItem: metaItem,
+    miniBar: miniBar, checkItem: checkItem, TONE_BY_STATUS: TONE_BY_STATUS
+  };
+})();
+
+
+/* =========================================================================
+   Charts — renderer SVG ringan, responsif, dengan tooltip & drill-down.
+   ========================================================================= */
+var Charts = (function () {
+
+  var PALETTE = ['#1A6B96', '#1E9E6A', '#6F5BD1', '#C7891F', '#D1494F', '#0B1E2D'];
+  var tipEl = null;
+  var registry = [];
+
+  function tip() {
+    if (!tipEl) tipEl = document.getElementById('chart-tip');
+    return tipEl;
+  }
+
+  function showTip(event, html) {
+    var el = tip();
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.add('is-visible');
+    var rect = el.getBoundingClientRect();
+    var x = event.clientX + 14;
+    var y = event.clientY - rect.height - 10;
+    if (x + rect.width > window.innerWidth - 8) x = event.clientX - rect.width - 14;
+    if (y < 8) y = event.clientY + 16;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+  }
+
+  function hideTip() {
+    var el = tip();
+    if (el) el.classList.remove('is-visible');
+  }
+
+  function niceMax(value) {
+    if (value <= 0) return 10;
+    var exp = Math.floor(Math.log(value) / Math.LN10);
+    var base = Math.pow(10, exp);
+    var normalized = value / base;
+    var step = normalized <= 1 ? 1 : (normalized <= 2 ? 2 : (normalized <= 5 ? 5 : 10));
+    return step * base;
+  }
+
+  function formatValue(value, format) {
+    if (format === 'percent') return UI.fmt.percent(value, 2);
+    if (format === 'currency') return UI.fmt.compactCurrency(value);
+    return UI.fmt.number(value, 0);
+  }
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    return el;
+  }
+
+  /** Render ulang seluruh chart (dipanggil saat resize). */
+  function refreshAll() {
+    registry.forEach(function (entry) {
+      if (document.body.contains(entry.container)) draw(entry.container, entry.spec);
+    });
+    registry = registry.filter(function (entry) { return document.body.contains(entry.container); });
+  }
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(refreshAll, 180);
+  });
+
+  /** API utama: Charts.render(container, spec) */
+  function render(container, spec) {
+    if (!container) return;
+    registry = registry.filter(function (entry) { return entry.container !== container; });
+    registry.push({ container: container, spec: spec });
+    draw(container, spec);
+  }
+
+  function draw(container, spec) {
+    var type = spec.type || 'line';
+    container.innerHTML = '';
+    container.classList.add('chart');
+    var width = container.clientWidth || 640;
+    if (type === 'line' || type === 'bar' || type === 'group') drawCartesian(container, spec, width);
+    else if (type === 'donut') drawDonut(container, spec, width);
+    else if (type === 'hbar') drawHbar(container, spec);
+  }
+
+  // ---- Cartesian (line / bar / grouped bar) -------------------------------
+  function drawCartesian(container, spec, width) {
+    var labels = spec.labels || [];
+    var series = spec.series || [];
+    var pad = { l: 46, r: 14, t: 14, b: 26 };
+
+    // Label sumbu X: dipotong bila sempit, dan dimiringkan bila masih bertabrakan.
+    var slotWidth = Math.max(1, (width - pad.l - pad.r) / Math.max(1, labels.length));
+    var flatMax = Math.max(4, Math.floor(slotWidth / 6.2));
+    var needsRotate = labels.some(function (l) { return String(l).length > flatMax; });
+    // Label miring memiliki ruang diagonal, jadi batas karakternya dilonggarkan
+    // (baris paralel berjarak slot × sin30° sehingga tetap tidak bertabrakan).
+    var maxChars = needsRotate ? 16 : flatMax;
+    if (needsRotate) pad.b = 64;
+
+    var height = (spec.height || 240) + (needsRotate ? 32 : 0);
+    var plotW = Math.max(40, width - pad.l - pad.r);
+    var plotH = height - pad.t - pad.b;
+
+    var maxValue = 0;
+    series.forEach(function (s) {
+      (s.values || []).forEach(function (v) { maxValue = Math.max(maxValue, Number(v) || 0); });
+    });
+    if (spec.target) maxValue = Math.max(maxValue, spec.target);
+    var top = niceMax(maxValue * 1.15) || 10;
+
+    var svg = svgEl('svg', { width: width, height: height, viewBox: '0 0 ' + width + ' ' + height, role: 'img' });
+    var yTo = function (v) { return pad.t + plotH - (Number(v) / top) * plotH; };
+
+    // Grid + sumbu Y
+    for (var g = 0; g <= 4; g++) {
+      var value = (top / 4) * g;
+      var y = yTo(value);
+      svg.appendChild(svgEl('line', { x1: pad.l, y1: y, x2: width - pad.r, y2: y, class: 'chart__grid-line' }));
+      var label = svgEl('text', { x: pad.l - 8, y: y + 3.5, 'text-anchor': 'end', class: 'chart__axis-label' });
+      label.textContent = spec.format === 'percent' ? UI.fmt.decimal(value, 1) : UI.fmt.compact(value);
+      svg.appendChild(label);
+    }
+
+    // Sumbu X
+    var slot = plotW / Math.max(1, labels.length);
+    labels.forEach(function (label, i) {
+      var full = String(label);
+      var shown = full.length > maxChars ? full.substring(0, Math.max(1, maxChars - 1)) + '…' : full;
+      var cx = pad.l + slot * i + slot / 2;
+      var cy = height - (needsRotate ? 14 : 8);
+      var text = svgEl('text', {
+        x: cx, y: cy, 'text-anchor': needsRotate ? 'end' : 'middle',
+        class: 'chart__axis-label chart__axis-x'
+      });
+      if (needsRotate) text.setAttribute('transform', 'rotate(-30 ' + cx + ' ' + cy + ')');
+      text.textContent = shown;
+      // <title> hanya ditambahkan bila label benar-benar dipotong, agar
+      // textContent tetap bersih untuk pembaca layar dan pengujian.
+      if (shown !== full) {
+        var tooltip = svgEl('title', {});
+        tooltip.textContent = full;
+        text.appendChild(tooltip);
+      }
+      svg.appendChild(text);
+    });
+
+    // Target line
+    if (spec.target) {
+      var ty = yTo(spec.target);
+      svg.appendChild(svgEl('line', { x1: pad.l, y1: ty, x2: width - pad.r, y2: ty, class: 'chart__target-line' }));
+      var tLabel = svgEl('text', { x: width - pad.r, y: ty - 5, 'text-anchor': 'end', class: 'chart__axis-label' });
+      tLabel.setAttribute('fill', '#C7891F');
+      tLabel.textContent = 'Target ' + formatValue(spec.target, spec.format);
+      svg.appendChild(tLabel);
+    }
+
+    if (spec.type === 'line') {
+      series.forEach(function (s, si) {
+        var color = s.color || PALETTE[si % PALETTE.length];
+        var points = (s.values || []).map(function (v, i) {
+          return { x: pad.l + slot * i + slot / 2, y: yTo(v), v: v };
+        });
+        if (points.length > 1) {
+          var area = 'M' + points[0].x + ',' + (pad.t + plotH) + points.map(function (p) {
+            return 'L' + p.x + ',' + p.y;
+          }).join('') + 'L' + points[points.length - 1].x + ',' + (pad.t + plotH) + 'Z';
+          svg.appendChild(svgEl('path', { d: area, fill: color, opacity: si === 0 ? .08 : .04 }));
+        }
+        var line = points.map(function (p, i) { return (i ? 'L' : 'M') + p.x + ',' + p.y; }).join('');
+        svg.appendChild(svgEl('path', {
+          d: line, fill: 'none', stroke: color, 'stroke-width': 2,
+          'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+        }));
+        points.forEach(function (p, i) {
+          var dot = svgEl('circle', { cx: p.x, cy: p.y, r: 3.2, fill: '#fff', stroke: color, 'stroke-width': 2, class: 'chart__point' });
+          svg.appendChild(dot);
+        });
+      });
+    } else {
+      var groupCount = series.length;
+      var barGap = 4;
+      var barW = Math.max(6, (slot * .62 - barGap * (groupCount - 1)) / groupCount);
+      series.forEach(function (s, si) {
+        var color = s.color || PALETTE[si % PALETTE.length];
+        (s.values || []).forEach(function (v, i) {
+          var h = Math.max(0, (Number(v) / top) * plotH);
+          var x = pad.l + slot * i + slot / 2 - (barW * groupCount + barGap * (groupCount - 1)) / 2 + si * (barW + barGap);
+          svg.appendChild(svgEl('rect', {
+            x: x, y: pad.t + plotH - h, width: barW, height: h, rx: 3, fill: color, class: 'chart__bar'
+          }));
+        });
+      });
+    }
+
+    // Hover zone per kolom (tooltip + drill-down)
+    labels.forEach(function (label, i) {
+      var zone = svgEl('rect', {
+        x: pad.l + slot * i, y: pad.t, width: slot, height: plotH, fill: 'transparent',
+        style: spec.onSelect ? 'cursor:pointer' : ''
+      });
+      zone.addEventListener('mousemove', function (event) {
+        var rows = series.map(function (s, si) {
+          return '<div class="chart-tip__row"><span>'
+            + '<span style="display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;background:'
+            + (s.color || PALETTE[si % PALETTE.length]) + '"></span>' + UI.escapeHtml(s.name) + '</span><b>'
+            + formatValue((s.values || [])[i], s.format || spec.format) + '</b></div>';
+        }).join('');
+        showTip(event, '<div class="chart-tip__title">' + UI.escapeHtml(label) + '</div>' + rows);
+      });
+      zone.addEventListener('mouseleave', hideTip);
+      if (spec.onSelect) {
+        zone.addEventListener('click', function () {
+          hideTip();
+          spec.onSelect((spec.keys && spec.keys[i]) || label, i);
+        });
+      }
+      svg.appendChild(zone);
+    });
+
+    container.appendChild(svg);
+
+    if (series.length > 1 || spec.showLegend) {
+      var legend = document.createElement('div');
+      legend.className = 'chart__legend';
+      legend.innerHTML = series.map(function (s, si) {
+        return '<span class="chart__legend-item"><span class="chart__legend-dot" style="background:'
+          + (s.color || PALETTE[si % PALETTE.length]) + '"></span>' + UI.escapeHtml(s.name) + '</span>';
+      }).join('');
+      container.appendChild(legend);
+    }
+  }
+
+  // ---- Donut --------------------------------------------------------------
+  function drawDonut(container, spec, width) {
+    var items = (spec.items || []).filter(function (i) { return Number(i.value) > 0; });
+    var size = Math.min(spec.size || 168, width);
+    var total = items.reduce(function (sum, i) { return sum + Number(i.value); }, 0);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'donut-wrap';
+
+    var chartBox = document.createElement('div');
+    chartBox.style.flex = '0 0 auto';
+
+    if (!total) {
+      wrap.innerHTML = '<div class="caption" style="padding:24px 0">Belum ada data untuk ditampilkan.</div>';
+      container.appendChild(wrap);
+      return;
+    }
+
+    var svg = svgEl('svg', { width: size, height: size, viewBox: '0 0 100 100' });
+    var toneColor = {
+      success: '#1E9E6A', warning: '#C7891F', danger: '#D1494F',
+      primary: '#1A6B96', purple: '#6F5BD1', muted: '#93A1B0'
+    };
+    var angle = -Math.PI / 2;
+    items.forEach(function (item, idx) {
+      var portion = Number(item.value) / total;
+      var end = angle + portion * Math.PI * 2;
+      var large = portion > .5 ? 1 : 0;
+      var r = 42, ri = 26, cx = 50, cy = 50;
+      var x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+      var x2 = cx + r * Math.cos(end), y2 = cy + r * Math.sin(end);
+      var x3 = cx + ri * Math.cos(end), y3 = cy + ri * Math.sin(end);
+      var x4 = cx + ri * Math.cos(angle), y4 = cy + ri * Math.sin(angle);
+      var d = 'M' + x1 + ',' + y1 + 'A' + r + ',' + r + ' 0 ' + large + ' 1 ' + x2 + ',' + y2
+        + 'L' + x3 + ',' + y3 + 'A' + ri + ',' + ri + ' 0 ' + large + ' 0 ' + x4 + ',' + y4 + 'Z';
+      var path = svgEl('path', {
+        d: d, fill: item.color || toneColor[item.tone] || PALETTE[idx % PALETTE.length],
+        style: spec.onSelect ? 'cursor:pointer' : ''
+      });
+      path.addEventListener('mousemove', function (event) {
+        showTip(event, '<div class="chart-tip__title">' + UI.escapeHtml(item.label) + '</div>'
+          + '<div class="chart-tip__row"><span>Jumlah</span><b>' + UI.fmt.number(item.value) + '</b></div>'
+          + '<div class="chart-tip__row"><span>Porsi</span><b>' + UI.fmt.percent(portion * 100, 1) + '</b></div>');
+      });
+      path.addEventListener('mouseleave', hideTip);
+      if (spec.onSelect) path.addEventListener('click', function () { hideTip(); spec.onSelect(item.id, item); });
+      svg.appendChild(path);
+      angle = end;
+    });
+
+    var totalText = svgEl('text', { x: 50, y: 48, 'text-anchor': 'middle' });
+    totalText.setAttribute('font-size', '15');
+    totalText.setAttribute('font-weight', '700');
+    totalText.setAttribute('fill', '#10233A');
+    totalText.textContent = UI.fmt.compact(total);
+    svg.appendChild(totalText);
+    var capText = svgEl('text', { x: 50, y: 60, 'text-anchor': 'middle' });
+    capText.setAttribute('font-size', '7');
+    capText.setAttribute('fill', '#6B7C8F');
+    capText.textContent = spec.totalLabel || 'TOTAL';
+    svg.appendChild(capText);
+
+    chartBox.appendChild(svg);
+    wrap.appendChild(chartBox);
+
+    var legend = document.createElement('div');
+    legend.className = 'donut-legend';
+    legend.innerHTML = items.map(function (item, idx) {
+      var color = item.color || toneColor[item.tone] || PALETTE[idx % PALETTE.length];
+      return '<div class="donut-legend__item" data-donut-id="' + UI.escapeHtml(item.id || '') + '">'
+        + '<span class="donut-legend__dot" style="background:' + color + '"></span>'
+        + '<span>' + UI.escapeHtml(item.label) + '</span>'
+        + '<span class="donut-legend__value num">' + UI.fmt.number(item.value) + '</span></div>';
+    }).join('');
+    if (spec.onSelect) {
+      legend.addEventListener('click', function (event) {
+        var row = event.target.closest('[data-donut-id]');
+        if (row) spec.onSelect(row.getAttribute('data-donut-id'));
+      });
+    }
+    wrap.appendChild(legend);
+    container.appendChild(wrap);
+  }
+
+  // ---- Horizontal bar ----------------------------------------------------
+  function drawHbar(container, spec) {
+    var items = spec.items || [];
+    if (!items.length) {
+      container.innerHTML = '<div class="caption" style="padding:20px 0">Belum ada data untuk ditampilkan.</div>';
+      return;
+    }
+    var max = items.reduce(function (m, i) { return Math.max(m, Number(i.value) || 0); }, 0) || 1;
+    var list = document.createElement('div');
+    list.className = 'hbar-list';
+    list.innerHTML = items.map(function (item) {
+      var pct = (Number(item.value) / max) * 100;
+      var color = item.color || (spec.tone === 'danger' ? '#D1494F' : '#1A6B96');
+      return '<div class="hbar" data-hbar-id="' + UI.escapeHtml(item.id || '') + '" title="'
+        + UI.escapeHtml(item.label) + '">'
+        + '<span class="hbar__label">' + UI.escapeHtml(item.label) + '</span>'
+        + '<span class="hbar__track"><span class="hbar__fill" style="width:' + pct + '%;background:' + color + '"></span></span>'
+        + '<span class="hbar__value num">' + formatValue(item.value, item.format || spec.format) + '</span></div>';
+    }).join('');
+    if (spec.onSelect) {
+      list.addEventListener('click', function (event) {
+        var row = event.target.closest('[data-hbar-id]');
+        if (row) spec.onSelect(row.getAttribute('data-hbar-id'));
+      });
+    }
+    container.appendChild(list);
+  }
+
+  return { render: render, refreshAll: refreshAll, PALETTE: PALETTE, hideTip: hideTip };
+})();
+</script>

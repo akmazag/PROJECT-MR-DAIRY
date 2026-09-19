@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+  <title>PROJECT MR DAIRY</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?!= include('CSS'); ?>
+</head>
+<body>
+
+<script>
+  /* Registrasi halaman bersifat order-independent: partial mendaftar ke antrian,
+     JS.html memprosesnya setelah seluruh core siap. */
+  window.definePage = function (id, definition) {
+    (window.__MRD_PAGES__ = window.__MRD_PAGES__ || []).push([id, definition]);
+  };
+</script>
+
+<!-- =====================================================================
+     BOOT SCREEN — tidak pernah menampilkan layar putih kosong
+     ===================================================================== -->
+<div id="boot-screen" class="setup-screen">
+  <div class="stack" style="align-items:center;gap:16px">
+    <div class="sidebar__logo" style="width:42px;height:42px;border-radius:12px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 2h8l-1 4v2l3 8a4 4 0 0 1-4 5h-4a4 4 0 0 1-4-5l3-8V6z"></path>
+      </svg>
+    </div>
+    <div class="row" style="gap:8px"><span class="spinner spinner--dark"></span>
+      <span class="caption">Menyiapkan PROJECT MR DAIRY…</span></div>
+  </div>
+</div>
+
+<!-- =====================================================================
+     SETUP SCREEN — first run (database belum tersedia)
+     ===================================================================== -->
+<div id="setup-screen" class="setup-screen" hidden>
+  <div class="setup-card card">
+    <div class="card__body">
+      <div class="row" style="gap:12px;align-items:flex-start">
+        <div class="empty__icon" style="background:var(--warning-bg);color:var(--warning)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="section-title">System Setup Required</h1>
+          <p class="caption" style="margin-top:4px;max-width:420px">
+            Struktur database belum tersedia pada spreadsheet ini. Jalankan inisialisasi untuk
+            membuat seluruh sheet, konfigurasi, dan user default secara otomatis.
+          </p>
+        </div>
+      </div>
+
+      <div class="status-list" style="margin-top:24px" id="setup-status-list"></div>
+
+      <div class="alert alert--info" style="margin-top:16px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px">
+          <circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path>
+        </svg>
+        <div>
+          <div class="alert__title">Tidak perlu membuat sheet manual</div>
+          setupDatabase() membuat 11 sheet, header, format, data validation, 60+ business rule
+          dan 5 user default. Aman dijalankan berulang.
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:20px;gap:8px">
+        <button class="btn btn--primary" id="btn-run-setup">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"></path>
+          </svg>
+          Initialize Database
+        </button>
+        <button class="btn btn--secondary" id="btn-refresh-status">Cek Ulang Status</button>
+      </div>
+      <p class="caption" style="margin-top:12px">
+        Tahap ini hanya tersedia saat database belum terbentuk. Setelah selesai, akses dikunci
+        untuk role ADMIN.
+      </p>
+    </div>
+  </div>
+</div>
+
+<?!= include('Login'); ?>
+
+<!-- =====================================================================
+     APLIKASI
+     ===================================================================== -->
+<div id="app" class="app-shell" hidden>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 2h8l-1 4v2l3 8a4 4 0 0 1-4 5h-4a4 4 0 0 1-4-5l3-8V6z"></path>
+        </svg>
+      </div>
+      <div class="sidebar__brand-text">
+        <div class="sidebar__name" id="brand-name">PROJECT MR DAIRY</div>
+        <div class="sidebar__tagline">Distribution &amp; Market Return</div>
+      </div>
+    </div>
+
+    <nav class="sidebar__nav" id="sidebar-nav" aria-label="Navigasi utama"></nav>
+
+    <div class="sidebar__footer">
+      <button class="user-chip" id="user-chip" type="button">
+        <span class="user-chip__avatar" id="user-initials">--</span>
+        <span style="min-width:0">
+          <span class="user-chip__name" id="user-name">—</span>
+          <span class="user-chip__role" id="user-role">—</span>
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn only-mobile" id="btn-menu" aria-label="Buka menu">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+      </button>
+      <div class="topbar__left">
+        <div class="breadcrumb" id="breadcrumb"><span>MR Dairy</span><span>Overview</span></div>
+        <div class="topbar__title" id="topbar-title">Overview</div>
+      </div>
+      <div class="topbar__actions">
+        <button class="btn btn--secondary btn--sm only-mobile" id="btn-filter-mobile">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          Filter
+        </button>
+        <button class="icon-btn" id="btn-notification" aria-label="Notifikasi">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"></path>
+          </svg>
+          <span class="icon-btn__dot" id="notification-dot" hidden></span>
+        </button>
+        <button class="icon-btn" id="btn-refresh" aria-label="Muat ulang data">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 2v6h-6M3 22v-6h6"></path>
+            <path d="M3.5 9a9 9 0 0 1 14.9-3.4L21 8M21 15a9 9 0 0 1-14.9 3.4L3 16"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="content-inner" id="page-host">
+        <?!= include('Dashboard'); ?>
+        <?!= include('Distribution'); ?>
+        <?!= include('MR'); ?>
+        <?!= include('SOP'); ?>
+        <?!= include('Monitoring'); ?>
+        <?!= include('Analytics'); ?>
+        <?!= include('MasterData'); ?>
+        <?!= include('Audit'); ?>
+        <?!= include('Settings'); ?>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Overlay, drawer, modal, toast, tooltip -->
+<div class="overlay" id="overlay"></div>
+
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="drawer__head">
+    <div style="min-width:0">
+      <div class="drawer__title" id="drawer-title">Detail</div>
+      <div class="drawer__sub" id="drawer-sub"></div>
+    </div>
+    <button class="icon-btn" id="drawer-close" aria-label="Tutup">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+  <div class="drawer__body" id="drawer-body"></div>
+  <div class="drawer__foot" id="drawer-foot" hidden></div>
+</aside>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal__head">
+    <div class="modal__title" id="modal-title">Konfirmasi</div>
+    <div class="modal__sub" id="modal-sub"></div>
+  </div>
+  <div class="modal__body" id="modal-body"></div>
+  <div class="modal__foot" id="modal-foot"></div>
+</div>
+
+<div class="toast-host" id="toast-host"></div>
+<div class="chart-tip" id="chart-tip"></div>
+
+<script>
+  window.BOOTSTRAP = <?!= bootstrap ?>;
+</script>
+
+<?!= include('Components'); ?>
+<?!= include('JS'); ?>
+
+</body>
+</html>

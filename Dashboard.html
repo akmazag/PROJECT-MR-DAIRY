@@ -1,0 +1,354 @@
+<!-- =========================================================================
+     Dashboard.html — Overview
+     ========================================================================= -->
+<section class="page" id="page-dashboard">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Overview</h1>
+      <p class="page-head__sub">
+        Distribution Planning &amp; Market Return Management ·
+        <span data-period-label class="text-muted">periode berjalan</span>
+      </p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn--secondary btn--sm" data-action="go-distribution">
+        Review allocation
+      </button>
+      <button class="btn btn--primary btn--sm" data-action="go-mr">
+        Administrasi MR
+      </button>
+    </div>
+  </div>
+
+  <div data-filter-slot></div>
+
+  <div class="grid grid--kpi" data-kpi-grid style="margin-bottom:16px"></div>
+
+  <div class="grid grid--2-1" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card-title">Market Return Trend</div>
+          <div class="caption">MR% dibanding target perusahaan</div>
+        </div>
+        <div class="segmented" data-trend-switch>
+          <button data-metric="mrPercent" class="is-active">MR %</button>
+          <button data-metric="volume">Volume</button>
+        </div>
+      </div>
+      <div class="card__body"><div data-chart-trend></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card-title">Project Output</div>
+          <div class="caption">Less Return · More Freshness</div>
+        </div>
+      </div>
+      <div class="card__body"><div data-objective></div></div>
+    </div>
+  </div>
+
+  <div class="grid grid--2-1">
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card-title">Prioritas risiko Market Return</div>
+          <div class="caption">Kombinasi account &amp; SKU dengan skor risiko tertinggi</div>
+        </div>
+        <button class="btn btn--ghost btn--sm" data-action="go-distribution">
+          Lihat semua
+        </button>
+      </div>
+      <div class="card__body card__body--flush"><div data-top-risk></div></div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card__head"><div class="card-title">Perlu tindak lanjut</div></div>
+        <div class="card__body" style="padding-top:8px"><div data-attention></div></div>
+      </div>
+      <div class="card">
+        <div class="card__head"><div class="card-title">Aktivitas terakhir</div></div>
+        <div class="card__body" style="padding-top:8px"><div data-activity></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+definePage('dashboard', {
+  title: 'Overview',
+  breadcrumb: ['MR Dairy', 'Overview'],
+  permission: 'dashboard.view',
+  filters: ['dateRange', 'region', 'area', 'account', 'cluster'],
+
+  mount: function (ctx) {
+    ctx.root.addEventListener('click', function (event) {
+      var action = event.target.closest('[data-action]');
+      if (!action) return;
+      var name = action.getAttribute('data-action');
+      if (name === 'go-distribution') App.navigate('distribution');
+      if (name === 'go-mr') App.navigate('mr');
+    });
+
+    ctx.all('[data-trend-switch] button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        ctx.all('[data-trend-switch] button').forEach(function (b) { b.classList.remove('is-active'); });
+        btn.classList.add('is-active');
+        ctx.root.__metric = btn.getAttribute('data-metric');
+        if (ctx.root.__data) renderTrend(ctx, ctx.root.__data);
+      });
+    });
+  },
+
+  load: function (ctx) {
+    ctx.el('[data-kpi-grid]').innerHTML = UI.skeletonKpi(8);
+    ctx.el('[data-chart-trend]').innerHTML = UI.skeletonChart(240);
+    ctx.el('[data-objective]').innerHTML = UI.skeletonTable(3, 1);
+    ctx.el('[data-top-risk]').innerHTML = UI.skeletonTable(5, 4);
+    ctx.el('[data-attention]').innerHTML = UI.skeletonTable(3, 1);
+    ctx.el('[data-activity]').innerHTML = UI.skeletonTable(3, 1);
+
+    Api.call('dashboard.summary', { filters: ctx.filters() }).then(function (data) {
+      ctx.root.__data = data;
+      paint(function () {
+        renderPeriod(ctx, data);
+        renderKpi(ctx, data);
+        renderTrend(ctx, data);
+        renderObjective(ctx, data);
+        renderTopRisk(ctx, data);
+        renderAttention(ctx, data);
+        renderActivity(ctx, data);
+      });
+      App.setNavBadge('mr', data.kpi.pendingApproval.value || 0);
+      var dot = document.getElementById('notification-dot');
+      if (dot) dot.hidden = !(data.attention && data.attention.length);
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat dashboard');
+      ctx.el('[data-kpi-grid]').innerHTML = '';
+      ctx.el('[data-chart-trend]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+      ctx.el('[data-objective]').innerHTML = '';
+      ctx.el('[data-top-risk]').innerHTML = '';
+      ctx.el('[data-attention]').innerHTML = '';
+      ctx.el('[data-activity]').innerHTML = '';
+    });
+  }
+});
+
+function renderPeriod(ctx, data) {
+  var label = UI.fmt.date(data.period.from) + ' – ' + UI.fmt.date(data.period.to);
+  ctx.all('[data-period-label]').forEach(function (el) { el.textContent = 'periode ' + label; });
+}
+
+function renderKpi(ctx, data) {
+  var k = data.kpi;
+  var cards = [
+    UI.kpiCard({
+      label: 'Market Return', valueHtml: UI.fmt.number(k.marketReturn.value), unit: 'qty',
+      delta: k.marketReturn.delta, good: k.marketReturn.good, iconName: 'package',
+      sub: UI.fmt.compactCurrency(k.marketReturnValue.value)
+    }),
+    UI.kpiCard({
+      label: 'MR %', valueHtml: UI.fmt.decimal(k.mrPercent.value, 2) + '<small>%</small>',
+      delta: k.mrPercent.delta, good: k.mrPercent.good, iconName: 'trending-down', accent: true,
+      sub: 'target ' + UI.fmt.decimal(data.target.mrPercent, 2) + '%'
+        + (data.target.achieved ? ' · tercapai' : ' · selisih +' + UI.fmt.decimal(data.target.gap, 2))
+    }),
+    UI.kpiCard({
+      label: 'Sell Out', valueHtml: UI.fmt.compact(k.sellOut.value), unit: 'qty',
+      delta: k.sellOut.delta, good: k.sellOut.good, iconName: 'trending-up',
+      sub: data.counts.account + ' account · ' + data.counts.sku + ' SKU'
+    }),
+    UI.kpiCard({
+      label: 'Recommended Allocation', valueHtml: UI.fmt.compact(k.allocation.value), unit: 'qty',
+      delta: k.allocation.delta, good: k.allocation.good, iconName: 'target',
+      sub: data.counts.plans + ' baris rencana tersimpan'
+    }),
+    UI.kpiCard({
+      label: 'Pending MR', valueHtml: UI.fmt.number(k.pendingMr.value), unit: 'dok',
+      iconName: 'clock', action: 'mr',
+      sub: 'dalam proses administrasi'
+    }),
+    UI.kpiCard({
+      label: 'Pending Approval', valueHtml: UI.fmt.number(k.pendingApproval.value), unit: 'dok',
+      iconName: 'shield', action: 'mr',
+      sub: 'menunggu keputusan Sales'
+    }),
+    UI.kpiCard({
+      label: 'Missed PO', valueHtml: UI.fmt.number(k.missedPo.value), unit: 'dok',
+      iconName: 'alert', action: 'sop',
+      sub: 'melewati cutoff tagihan'
+    }),
+    UI.kpiCard({
+      label: 'SO Created', valueHtml: UI.fmt.number(k.soCreated.value), unit: 'dok',
+      iconName: 'file', action: 'monitoring',
+      sub: 'SO otomatis dari MR disetujui'
+    })
+  ];
+  var grid = ctx.el('[data-kpi-grid]');
+  grid.innerHTML = cards.join('');
+  grid.querySelectorAll('[data-kpi-action]').forEach(function (card) {
+    card.addEventListener('click', function () { App.navigate(card.getAttribute('data-kpi-action')); });
+  });
+}
+
+function renderTrend(ctx, data) {
+  var metric = ctx.root.__metric || 'mrPercent';
+  var labels = data.trend.map(function (t) { return t.label; });
+  var spec;
+  if (metric === 'mrPercent') {
+    spec = {
+      type: 'line', labels: labels, format: 'percent', height: 250,
+      target: data.target.mrPercent,
+      series: [{ name: 'MR %', values: data.trend.map(function (t) { return t.mrPercent; }), color: '#D1494F' }],
+      keys: data.trend.map(function (t) { return t.key; }),
+      onSelect: function (key) { App.navigate('analytics', { drill: { dimension: 'month', key: key } }); }
+    };
+  } else {
+    spec = {
+      type: 'line', labels: labels, height: 250,
+      series: [
+        { name: 'Sell Out', values: data.trend.map(function (t) { return t.sellOut; }), color: '#1A6B96' },
+        { name: 'Return', values: data.trend.map(function (t) { return t.returnQty; }), color: '#D1494F' }
+      ],
+      keys: data.trend.map(function (t) { return t.key; }),
+      onSelect: function (key) { App.navigate('analytics', { drill: { dimension: 'month', key: key } }); }
+    };
+  }
+  Charts.render(ctx.el('[data-chart-trend]'), spec);
+}
+
+function renderObjective(ctx, data) {
+  var o = data.objective;
+  var risk = data.riskDistribution;
+  var totalPairs = (risk.HIGH + risk.MEDIUM + risk.LOW) || 1;
+  ctx.el('[data-objective]').innerHTML = [
+    '<div class="stack">',
+    '<div>',
+    '<div class="row row--between"><span class="overline">Less Return</span>',
+    UI.badge(o.lessReturn.achieved ? 'ON TARGET' : 'DI ATAS TARGET', o.lessReturn.achieved ? 'success' : 'danger'),
+    '</div>',
+    '<div class="row" style="align-items:baseline;gap:8px;margin-top:4px">',
+    '<span class="stat-strip__value">' + UI.fmt.decimal(o.lessReturn.value, 2) + '%</span>',
+    '<span class="caption">vs target ' + UI.fmt.decimal(o.lessReturn.target, 2) + '%</span></div>',
+    UI.miniBar(Math.min(100, (o.lessReturn.value / Math.max(o.lessReturn.target, .01)) * 50),
+      o.lessReturn.achieved ? 'success' : 'danger'),
+    '</div>',
+
+    '<div>',
+    '<div class="row row--between"><span class="overline">More Freshness</span>',
+    '<span class="caption">' + risk.HIGH + ' pasangan berisiko tinggi</span></div>',
+    '<div class="row" style="align-items:baseline;gap:8px;margin-top:4px">',
+    '<span class="stat-strip__value">' + UI.fmt.decimal(o.moreFreshness.value, 1) + '%</span>',
+    '<span class="caption">account × SKU berisiko rendah</span></div>',
+    UI.miniBar(o.moreFreshness.value, 'success'),
+    '</div>',
+
+    '<div>',
+    '<div class="row row--between"><span class="overline">On Time Administration</span>',
+    '<span class="caption">' + o.onTimeAdministration.overdue + ' melewati SLA</span></div>',
+    '<div class="row" style="align-items:baseline;gap:8px;margin-top:4px">',
+    '<span class="stat-strip__value">' + UI.fmt.decimal(o.onTimeAdministration.value, 1) + '%</span>',
+    '<span class="caption">dokumen MR sesuai SLA</span></div>',
+    UI.miniBar(o.onTimeAdministration.value, o.onTimeAdministration.value >= 90 ? 'success' : 'warning'),
+    '</div>',
+
+    '<div class="panel" style="padding:12px">',
+    '<div class="row" style="justify-content:space-between;font-size:12px">',
+    '<span class="text-muted">Sebaran risiko</span>',
+    '<span><b class="num">' + risk.LOW + '</b> low · <b class="num">' + risk.MEDIUM + '</b> medium · '
+      + '<b class="num text-danger">' + risk.HIGH + '</b> high</span></div>',
+    '<div style="display:flex;height:6px;border-radius:99px;overflow:hidden;margin-top:8px">',
+    '<span style="width:' + (risk.LOW / totalPairs * 100) + '%;background:var(--green-500)"></span>',
+    '<span style="width:' + (risk.MEDIUM / totalPairs * 100) + '%;background:var(--amber-500)"></span>',
+    '<span style="width:' + (risk.HIGH / totalPairs * 100) + '%;background:var(--red-500)"></span>',
+    '</div></div>',
+    '</div>'
+  ].join('');
+}
+
+function renderTopRisk(ctx, data) {
+  var rows = data.topRisk || [];
+  if (!rows.length) {
+    ctx.el('[data-top-risk]').innerHTML = UI.emptyState({
+      icon: 'check', title: 'Tidak ada risiko tinggi',
+      desc: 'Seluruh kombinasi account dan SKU berada pada tingkat risiko yang terkendali.'
+    });
+    return;
+  }
+  ctx.el('[data-top-risk]').innerHTML = UI.table({
+    compact: true,
+    columns: [
+      {
+        key: 'accountName', label: 'Account / SKU', render: function (row) {
+          return '<span class="t-strong">' + UI.escapeHtml(row.accountName) + '</span>'
+            + '<span class="table__cell-sub">' + UI.escapeHtml(row.skuName) + '</span>';
+        }
+      },
+      { key: 'mrPercent', label: 'MR %', align: 'right', render: function (r) { return UI.fmt.percent(r.mrPercent, 2); } },
+      { key: 'currentStock', label: 'Stock', align: 'right', render: function (r) { return UI.fmt.number(r.currentStock); } },
+      {
+        key: 'recommendedAllocation', label: 'Rekomendasi', align: 'right', render: function (r) {
+          return '<span class="t-strong">' + UI.fmt.number(r.recommendedAllocation) + '</span>';
+        }
+      },
+      { key: 'riskLevel', label: 'Risiko', align: 'center', render: function (r) { return UI.riskBadge(r.riskLevel, r.riskScore); } }
+    ],
+    rows: rows,
+    rowAttrs: function (row) {
+      return 'style="cursor:pointer" data-risk-account="' + UI.escapeHtml(row.accountId)
+        + '" data-risk-sku="' + UI.escapeHtml(row.skuId) + '"';
+    }
+  });
+  ctx.all('[data-risk-account]').forEach(function (tr) {
+    tr.addEventListener('click', function () {
+      App.navigate('distribution', {
+        review: { accountId: tr.getAttribute('data-risk-account'), skuId: tr.getAttribute('data-risk-sku') }
+      });
+    });
+  });
+}
+
+function renderAttention(ctx, data) {
+  var items = data.attention || [];
+  if (!items.length) {
+    ctx.el('[data-attention]').innerHTML = '<div class="caption" style="padding:8px 0">'
+      + 'Tidak ada item yang memerlukan tindakan segera.</div>';
+    return;
+  }
+  ctx.el('[data-attention]').innerHTML = items.map(function (item) {
+    var tone = item.severity === 'danger' ? 'danger' : (item.severity === 'warning' ? 'warning' : 'info');
+    return '<div class="check-item" style="cursor:pointer" data-attention-page="'
+      + UI.escapeHtml(item.action ? item.action.page : '') + '">'
+      + '<span class="check-item__icon check-item__icon--' + (tone === 'info' ? 'pass' : tone === 'danger' ? 'error' : 'warning') + '">'
+      + UI.icon(tone === 'danger' ? 'alert' : 'info', 11) + '</span>'
+      + '<div><div class="check-item__label">' + UI.escapeHtml(item.title) + '</div>'
+      + '<div class="check-item__msg">' + UI.escapeHtml(item.description) + '</div></div></div>';
+  }).join('');
+  ctx.all('[data-attention-page]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var page = el.getAttribute('data-attention-page');
+      if (page) App.navigate(page);
+    });
+  });
+}
+
+function renderActivity(ctx, data) {
+  var rows = data.recentActivity || [];
+  if (!rows.length) {
+    ctx.el('[data-activity]').innerHTML = '<div class="caption" style="padding:8px 0">Belum ada aktivitas tercatat.</div>';
+    return;
+  }
+  ctx.el('[data-activity]').innerHTML = '<div class="timeline">' + rows.map(function (row) {
+    return '<div class="timeline__item"><span class="timeline__dot is-done">' + UI.icon('check', 9) + '</span>'
+      + '<div style="min-width:0"><div class="timeline__label">' + UI.fmt.label(row.action) + ' · '
+      + UI.escapeHtml(row.module) + '</div>'
+      + '<div class="timeline__meta">' + UI.escapeHtml(row.description || '') + '</div>'
+      + '<div class="timeline__meta">' + UI.escapeHtml(row.user) + ' · ' + UI.fmt.relative(row.timestamp) + '</div>'
+      + '</div></div>';
+  }).join('') + '</div>';
+}
+</script>

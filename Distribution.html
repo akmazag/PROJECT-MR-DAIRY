@@ -1,0 +1,925 @@
+<!-- =========================================================================
+     Distribution.html — Distribution Planning
+     Allocation Control / Clustering → Review Data → Determine Plan Sell In
+     ========================================================================= -->
+<section class="page" id="page-distribution">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Distribution Planning</h1>
+      <p class="page-head__sub">
+        Allocation control berbasis sell out, return, stock dan potensi account ·
+        <span data-period-label class="text-muted"></span>
+      </p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn--secondary btn--sm" data-dist="export">
+        Export CSV
+      </button>
+      <button class="btn btn--primary btn--sm" data-dist="bulk-accept" hidden>
+        Terapkan rekomendasi (<span data-selected-count>0</span>)
+      </button>
+    </div>
+  </div>
+
+  <div class="tabs" data-dist-tabs>
+    <button class="tab is-active" data-tab="allocation">Allocation Control</button>
+    <button class="tab" data-tab="cluster">Clustering Account</button>
+    <button class="tab" data-tab="plans">Rencana Tersimpan</button>
+  </div>
+
+  <div data-filter-slot></div>
+
+  <!-- ===== TAB: ALLOCATION CONTROL ===== -->
+  <div data-tab-panel="allocation">
+    <div class="grid grid--kpi" data-dist-kpi style="margin-bottom:16px"></div>
+
+    <div class="grid grid--2-1" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card__head">
+          <div>
+            <div class="card-title">Sell Out vs Return</div>
+            <div class="caption">Pergerakan bulanan pada filter aktif</div>
+          </div>
+        </div>
+        <div class="card__body"><div data-dist-trend></div></div>
+      </div>
+      <div class="card">
+        <div class="card__head">
+          <div>
+            <div class="card-title">Sebaran Risiko</div>
+            <div class="caption">Account × SKU</div>
+          </div>
+        </div>
+        <div class="card__body"><div data-dist-risk></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card-title">Allocation Table</div>
+          <div class="caption" data-dist-count>—</div>
+        </div>
+        <div class="row" style="gap:8px">
+          <div class="segmented" data-dist-sort>
+            <button data-sort="risk" class="is-active">Risiko</button>
+            <button data-sort="mr">MR %</button>
+            <button data-sort="allocation">Allocation</button>
+            <button data-sort="sellout">Sell Out</button>
+          </div>
+        </div>
+      </div>
+      <div class="card__body card__body--flush">
+        <div data-dist-table></div>
+      </div>
+      <div data-dist-pagination></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: CLUSTERING ===== -->
+  <div data-tab-panel="cluster" hidden>
+    <div class="grid grid--1-2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card__head">
+          <div>
+            <div class="card-title">Distribusi Cluster</div>
+            <div class="caption">Usulan sistem</div>
+          </div>
+        </div>
+        <div class="card__body"><div data-cluster-donut></div></div>
+      </div>
+      <div class="card">
+        <div class="card__head">
+          <div>
+            <div class="card-title">Cara skor potensi dihitung</div>
+            <div class="caption">Seluruh bobot &amp; ambang dapat diubah pada Settings</div>
+          </div>
+        </div>
+        <div class="card__body"><div data-cluster-formula></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card-title">Clustering Account</div>
+          <div class="caption" data-cluster-count>—</div>
+        </div>
+        <button class="btn btn--primary btn--sm" data-dist="apply-cluster" hidden>
+          Terapkan cluster terpilih
+        </button>
+      </div>
+      <div class="card__body card__body--flush"><div data-cluster-table></div></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: RENCANA TERSIMPAN ===== -->
+  <div data-tab-panel="plans" hidden>
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card-title">Allocation Plan</div>
+          <div class="caption" data-plans-count>—</div>
+        </div>
+        <div class="row" style="gap:8px" data-plan-actions></div>
+      </div>
+      <div class="card__body card__body--flush"><div data-plans-table></div></div>
+      <div data-plans-pagination></div>
+    </div>
+  </div>
+</section>
+
+<script>
+definePage('distribution', {
+  title: 'Distribution Planning',
+  breadcrumb: ['MR Dairy', 'Distribution Planning'],
+  permission: 'distribution.view',
+  filters: ['dateRange', 'region', 'area', 'account', 'sku', 'cluster', 'risk'],
+
+  mount: function (ctx) {
+    ctx.root.__state = { tab: 'allocation', page: 1, sort: 'risk', selected: {}, clusterSel: {}, planSel: {} };
+
+    ctx.all('[data-dist-tabs] .tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var name = tab.getAttribute('data-tab');
+        ctx.root.__state.tab = name;
+        ctx.all('[data-dist-tabs] .tab').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
+        ctx.all('[data-tab-panel]').forEach(function (panel) {
+          panel.hidden = panel.getAttribute('data-tab-panel') !== name;
+        });
+        Dist.loadTab(ctx);
+      });
+    });
+
+    ctx.all('[data-dist-sort] button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        ctx.root.__state.sort = btn.getAttribute('data-sort');
+        ctx.root.__state.page = 1;
+        ctx.all('[data-dist-sort] button').forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+        Dist.loadAllocation(ctx);
+      });
+    });
+
+    ctx.root.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-dist]');
+      if (!btn) return;
+      var action = btn.getAttribute('data-dist');
+      if (action === 'export') Dist.exportCsv(ctx);
+      if (action === 'bulk-accept') Dist.bulkAccept(ctx);
+      if (action === 'apply-cluster') Dist.applyCluster(ctx);
+    });
+  },
+
+  load: function (ctx) {
+    var period = ctx.filters();
+    ctx.all('[data-period-label]').forEach(function (el) {
+      el.textContent = 'periode ' + UI.fmt.date(period.dateFrom) + ' – ' + UI.fmt.date(period.dateTo);
+    });
+    Dist.loadTab(ctx);
+    if (ctx.params && ctx.params.review) {
+      var target = ctx.params.review;
+      ctx.params.review = null;
+      setTimeout(function () { Dist.openReview(ctx, target.accountId, target.skuId); }, 350);
+    }
+  }
+});
+
+var Dist = {
+
+  loadTab: function (ctx) {
+    var tab = ctx.root.__state.tab;
+    if (tab === 'allocation') Dist.loadAllocation(ctx);
+    if (tab === 'cluster') Dist.loadCluster(ctx);
+    if (tab === 'plans') Dist.loadPlans(ctx);
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Allocation control                                                  */
+  /* ------------------------------------------------------------------ */
+  loadAllocation: function (ctx) {
+    var state = ctx.root.__state;
+    ctx.el('[data-dist-kpi]').innerHTML = UI.skeletonKpi(6);
+    ctx.el('[data-dist-table]').innerHTML = UI.skeletonTable(8, 6);
+    ctx.el('[data-dist-trend]').innerHTML = UI.skeletonChart(220);
+    ctx.el('[data-dist-risk]').innerHTML = UI.skeletonChart(180);
+
+    Api.call('distribution.workspace', {
+      filters: ctx.filters(), page: state.page, sort: state.sort,
+      pageSize: App.state.settings.pageSize || 25
+    }).then(function (data) {
+      ctx.root.__ws = data;
+      paint(function () {
+        Dist.renderKpi(ctx, data);
+        Dist.renderCharts(ctx, data);
+        Dist.renderTable(ctx, data);
+      });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat allocation');
+      ctx.el('[data-dist-kpi]').innerHTML = '';
+      ctx.el('[data-dist-table]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+      ctx.el('[data-dist-trend]').innerHTML = '';
+      ctx.el('[data-dist-risk]').innerHTML = '';
+    });
+  },
+
+  renderKpi: function (ctx, data) {
+    var k = data.kpi;
+    ctx.el('[data-dist-kpi]').innerHTML = [
+      UI.kpiCard({ label: 'Total Account', valueHtml: UI.fmt.number(k.totalAccount), iconName: 'user' }),
+      UI.kpiCard({ label: 'Total SKU', valueHtml: UI.fmt.number(k.totalSku), iconName: 'package' }),
+      UI.kpiCard({ label: 'Avg Sell Out', valueHtml: UI.fmt.compact(k.avgSellOut), unit: '/bln', iconName: 'trending-up' }),
+      UI.kpiCard({ label: 'Avg Return', valueHtml: UI.fmt.compact(k.avgReturn), unit: '/bln', iconName: 'package' }),
+      UI.kpiCard({
+        label: 'MR %', valueHtml: UI.fmt.decimal(k.mrPercent, 2) + '<small>%</small>', accent: true,
+        iconName: 'target', sub: 'target ' + UI.fmt.decimal(k.targetMrPercent, 2) + '%'
+      }),
+      UI.kpiCard({
+        label: 'Recommended Allocation', valueHtml: UI.fmt.compact(k.recommendedAllocation), unit: 'qty',
+        iconName: 'layers', sub: k.plannedSellIn ? 'rencana tersimpan ' + UI.fmt.compact(k.plannedSellIn) : 'belum ada rencana'
+      })
+    ].join('');
+  },
+
+  renderCharts: function (ctx, data) {
+    Charts.render(ctx.el('[data-dist-trend]'), {
+      type: 'line', height: 220,
+      labels: data.trend.map(function (t) { return t.label; }),
+      series: [
+        { name: 'Sell Out', values: data.trend.map(function (t) { return t.sellOut; }), color: '#1A6B96' },
+        { name: 'Return', values: data.trend.map(function (t) { return t.returnQty; }), color: '#D1494F' }
+      ]
+    });
+    Charts.render(ctx.el('[data-dist-risk]'), {
+      type: 'donut', size: 150, totalLabel: 'PASANGAN',
+      items: [
+        { id: 'HIGH', label: 'High Risk', value: data.riskDistribution.HIGH, tone: 'danger' },
+        { id: 'MEDIUM', label: 'Medium Risk', value: data.riskDistribution.MEDIUM, tone: 'warning' },
+        { id: 'LOW', label: 'Low Risk', value: data.riskDistribution.LOW, tone: 'success' }
+      ],
+      onSelect: function (id) { Filters.set({ risk: id }); }
+    });
+  },
+
+  renderTable: function (ctx, data) {
+    var state = ctx.root.__state;
+    var canPlan = App.can('distribution.plan');
+    ctx.el('[data-dist-count]').textContent = UI.fmt.number(data.meta.total) + ' kombinasi account × SKU';
+
+    if (!data.rows.length) {
+      ctx.el('[data-dist-table]').innerHTML = UI.emptyState({
+        icon: 'target', title: 'Belum ada data allocation',
+        desc: 'Tidak ada transaksi pada filter dan periode ini. Ubah filter atau mulai dari review performa account.',
+        actionLabel: 'Reset filter', action: 'reset-filter'
+      });
+      ctx.el('[data-dist-pagination]').innerHTML = '';
+      var resetBtn = ctx.el('[data-empty-action="reset-filter"]');
+      if (resetBtn) resetBtn.addEventListener('click', Filters.reset);
+      return;
+    }
+
+    var columns = [];
+    if (canPlan) {
+      columns.push({
+        key: '_sel', label: '', align: 'center', render: function (row) {
+          return '<label class="checkbox"><input type="checkbox" data-row-select="' + UI.escapeHtml(row.key)
+            + '"' + (state.selected[row.key] ? ' checked' : '') + '></label>';
+        }
+      });
+    }
+    columns = columns.concat([
+      {
+        key: 'accountName', label: 'Account / SKU', render: function (row) {
+          return '<span class="t-strong">' + UI.escapeHtml(row.accountName) + '</span>'
+            + '<span class="table__cell-sub">' + UI.escapeHtml(row.skuName) + ' · ' + UI.escapeHtml(row.region) + '</span>';
+        }
+      },
+      { key: 'avgSellOut', label: 'Avg Sell Out', align: 'right', render: function (r) { return UI.fmt.decimal(r.avgSellOut, 1); } },
+      { key: 'avgReturn', label: 'Avg Return', align: 'right', render: function (r) { return UI.fmt.decimal(r.avgReturn, 1); } },
+      {
+        key: 'mrPercent', label: 'MR %', align: 'right', render: function (r) {
+          var tone = r.mrPercent >= App.state.settings.mrThresholdHigh ? 'text-danger'
+            : (r.mrPercent >= App.state.settings.mrThresholdMedium ? 'text-warning' : '');
+          return '<span class="' + tone + '" style="font-weight:600">' + UI.fmt.decimal(r.mrPercent, 2) + '%</span>';
+        }
+      },
+      {
+        key: 'currentStock', label: 'Stock', align: 'right', render: function (r) {
+          return UI.fmt.number(r.currentStock)
+            + '<span class="table__cell-sub">' + (r.stockMovement > 0 ? '+' : '') + UI.fmt.number(r.stockMovement) + '</span>';
+        }
+      },
+      { key: 'potential', label: 'Potensi', align: 'center', render: function (r) { return UI.statusBadge(r.potential, { potential: true }); } },
+      {
+        key: 'recommendedAllocation', label: 'Rekomendasi', align: 'right', render: function (r) {
+          return '<span class="t-strong">' + UI.fmt.number(r.recommendedAllocation) + '</span>';
+        }
+      },
+      {
+        key: 'plannedSellIn', label: 'Plan Sell In', align: 'right', render: function (r) {
+          if (r.plannedSellIn === null) return '<span class="text-muted">—</span>';
+          var diff = r.plannedSellIn - r.recommendedAllocation;
+          return '<span class="t-strong">' + UI.fmt.number(r.plannedSellIn) + '</span>'
+            + (diff ? '<span class="table__cell-sub">' + (diff > 0 ? '+' : '') + UI.fmt.number(diff) + ' vs rekomendasi</span>' : '');
+        }
+      },
+      { key: 'riskLevel', label: 'Risiko', align: 'center', render: function (r) { return UI.riskBadge(r.riskLevel, r.riskScore); } },
+      { key: 'planStatus', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.planStatus); } },
+      {
+        key: '_act', label: '', align: 'right', render: function (row) {
+          return '<div class="table__actions">'
+            + '<button class="btn btn--ghost btn--sm" data-review="' + UI.escapeHtml(row.accountId)
+            + '|' + UI.escapeHtml(row.skuId) + '" title="Review data">' + UI.icon('eye', 14) + '</button>'
+            + (canPlan ? '<button class="btn btn--ghost btn--sm" data-plan="' + UI.escapeHtml(row.accountId)
+              + '|' + UI.escapeHtml(row.skuId) + '" title="Determine plan sell in">' + UI.icon('edit', 14) + '</button>' : '')
+            + '</div>';
+        }
+      }
+    ]);
+
+    ctx.el('[data-dist-table]').innerHTML = UI.table({ columns: columns, rows: data.rows });
+    ctx.el('[data-dist-pagination]').innerHTML = UI.pagination(data.meta);
+
+    ctx.all('[data-dist-pagination] .page-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        ctx.root.__state.page = Number(btn.getAttribute('data-page'));
+        Dist.loadAllocation(ctx);
+      });
+    });
+    ctx.all('[data-review]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var parts = btn.getAttribute('data-review').split('|');
+        Dist.openReview(ctx, parts[0], parts[1]);
+      });
+    });
+    ctx.all('[data-plan]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var parts = btn.getAttribute('data-plan').split('|');
+        Dist.openPlan(ctx, parts[0], parts[1]);
+      });
+    });
+    ctx.all('[data-row-select]').forEach(function (box) {
+      box.addEventListener('change', function () {
+        var key = box.getAttribute('data-row-select');
+        if (box.checked) state.selected[key] = true; else delete state.selected[key];
+        Dist.updateSelection(ctx);
+      });
+    });
+    Dist.updateSelection(ctx);
+  },
+
+  updateSelection: function (ctx) {
+    var count = Object.keys(ctx.root.__state.selected).length;
+    var btn = ctx.el('[data-dist="bulk-accept"]');
+    if (btn) {
+      btn.hidden = count === 0;
+      var label = ctx.el('[data-selected-count]');
+      if (label) label.textContent = count;
+    }
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Review Data (drawer)                                                */
+  /* ------------------------------------------------------------------ */
+  openReview: function (ctx, accountId, skuId) {
+    Drawer.open({
+      wide: true,
+      title: 'Review Account & SKU',
+      sub: 'Historical performance sebelum menentukan allocation',
+      body: '<div class="stack">' + UI.skeletonKpi(3) + UI.skeletonChart(200) + '</div>'
+    });
+    Api.call('distribution.review', {
+      accountId: accountId, skuId: skuId, filters: ctx.filters()
+    }).then(function (data) {
+      if (data.empty) {
+        Drawer.setBody(UI.emptyState({
+          icon: 'inbox', title: 'Belum ada transaksi',
+          desc: data.message || 'Account ini belum memiliki transaksi pada periode terpilih.'
+        }));
+        return;
+      }
+      var k = data.kpi;
+      var account = data.account;
+      var sku = data.sku;
+      var body = Drawer.setBody([
+        '<div class="stack">',
+        '<div class="panel"><div class="row row--between" style="margin-bottom:12px">',
+        '<div><div class="card-title">' + UI.escapeHtml(account.ACCOUNT_NAME) + '</div>',
+        '<div class="caption">' + UI.escapeHtml(account.ACCOUNT_CODE) + ' · ' + UI.escapeHtml(account.CHANNEL)
+          + ' · ' + UI.escapeHtml(account.AREA) + ', ' + UI.escapeHtml(account.REGION) + '</div></div>',
+        UI.statusBadge(account.POTENTIAL_LEVEL, { potential: true }),
+        '</div>',
+        '<div class="meta-grid">',
+        UI.metaItem('SKU', sku ? UI.escapeHtml(sku.SKU_NAME) : 'Seluruh SKU account'),
+        UI.metaItem('Cluster', UI.statusBadge(account.CLUSTER, { potential: true })),
+        UI.metaItem('Shelf life', sku ? UI.fmt.number(sku.SHELF_LIFE_DAYS) + ' hari' : '—'),
+        UI.metaItem('Periode', UI.fmt.date(data.period.from) + ' – ' + UI.fmt.date(data.period.to)),
+        '</div></div>',
+
+        '<div class="grid grid--3" style="gap:12px">',
+        UI.kpiCard({ label: 'Total Sell Out', valueHtml: UI.fmt.compact(k.totalSellOut), unit: 'qty' }),
+        UI.kpiCard({ label: 'Total Return', valueHtml: UI.fmt.compact(k.totalReturn), unit: 'qty' }),
+        UI.kpiCard({
+          label: 'MR %', valueHtml: UI.fmt.decimal(k.mrPercent, 2) + '<small>%</small>', accent: true,
+          sub: 'target ' + UI.fmt.decimal(k.targetMrPercent, 2) + '%'
+        }),
+        UI.kpiCard({ label: 'Avg Sell Out', valueHtml: UI.fmt.decimal(k.avgSellOut, 1), unit: '/bln' }),
+        UI.kpiCard({ label: 'Current Stock', valueHtml: UI.fmt.number(k.currentStock), unit: 'qty',
+          sub: 'movement ' + (k.stockMovement > 0 ? '+' : '') + UI.fmt.number(k.stockMovement) }),
+        UI.kpiCard({ label: 'Recommended', valueHtml: UI.fmt.number(k.recommendedAllocation), unit: 'qty' }),
+        '</div>',
+
+        '<div class="card"><div class="card__head"><div class="card-title">Historical Sell Out &amp; Return</div></div>',
+        '<div class="card__body"><div id="review-trend"></div></div></div>',
+
+        '<div class="card"><div class="card__head"><div class="card-title">MR % Trend</div>',
+        '<span class="caption">garis putus-putus = target</span></div>',
+        '<div class="card__body"><div id="review-mr"></div></div></div>',
+
+        k.riskComponents ? '<div class="card"><div class="card__head">'
+          + '<div class="card-title">Komponen skor risiko</div>'
+          + UI.riskBadge(k.riskLevel, k.riskScore) + '</div><div class="card__body">'
+          + Dist.riskBreakdown(k.riskComponents) + '</div></div>' : '',
+
+        data.skuBreakdown.length > 1 ? '<div class="card"><div class="card__head">'
+          + '<div class="card-title">Performa per SKU</div></div>'
+          + '<div class="card__body card__body--flush">' + UI.table({
+            compact: true,
+            columns: [
+              { key: 'skuName', label: 'SKU', render: function (r) { return UI.escapeHtml(r.skuName); } },
+              { key: 'totalSellOut', label: 'Sell Out', align: 'right', render: function (r) { return UI.fmt.number(r.totalSellOut); } },
+              { key: 'totalReturn', label: 'Return', align: 'right', render: function (r) { return UI.fmt.number(r.totalReturn); } },
+              { key: 'mrPercent', label: 'MR %', align: 'right', render: function (r) { return UI.fmt.percent(r.mrPercent, 2); } },
+              { key: 'riskLevel', label: 'Risiko', align: 'center', render: function (r) { return UI.riskBadge(r.riskLevel, r.riskScore); } },
+              {
+                key: '_a', label: '', align: 'right', render: function (r) {
+                  return '<button class="btn btn--ghost btn--sm" data-review-sku="' + UI.escapeHtml(r.skuId) + '">'
+                    + UI.icon('arrow-right', 13) + '</button>';
+                }
+              }
+            ],
+            rows: data.skuBreakdown
+          }) + '</div></div>' : '',
+
+        data.planHistory.length ? '<div class="card"><div class="card__head">'
+          + '<div class="card-title">Riwayat rencana</div></div><div class="card__body card__body--flush">'
+          + UI.table({
+            compact: true,
+            columns: [
+              { key: 'PLAN_DATE', label: 'Tanggal', render: function (r) { return UI.fmt.date(r.PLAN_DATE); } },
+              { key: 'RECOMMENDED_ALLOCATION', label: 'Rekomendasi', align: 'right', render: function (r) { return UI.fmt.number(r.RECOMMENDED_ALLOCATION); } },
+              { key: 'PLANNED_SELL_IN', label: 'Final', align: 'right', render: function (r) { return UI.fmt.number(r.PLANNED_SELL_IN); } },
+              { key: 'STATUS', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.STATUS); } },
+              { key: 'CREATED_BY', label: 'Oleh', render: function (r) {
+                  return UI.escapeHtml(r.CREATED_BY) + (r.OVERRIDE_REASON
+                    ? '<span class="table__cell-sub">override: ' + UI.escapeHtml(r.OVERRIDE_REASON) + '</span>' : '');
+                } }
+            ],
+            rows: data.planHistory
+          }) + '</div></div>' : '',
+        '</div>'
+      ].join(''));
+
+      Charts.render(document.getElementById('review-trend'), {
+        type: 'line', height: 210,
+        labels: data.trend.map(function (t) { return t.label; }),
+        series: [
+          { name: 'Sell Out', values: data.trend.map(function (t) { return t.sellOut; }), color: '#1A6B96' },
+          { name: 'Sell In', values: data.trend.map(function (t) { return t.sellIn; }), color: '#6F5BD1' },
+          { name: 'Return', values: data.trend.map(function (t) { return t.returnQty; }), color: '#D1494F' }
+        ]
+      });
+      Charts.render(document.getElementById('review-mr'), {
+        type: 'line', height: 190, format: 'percent', target: k.targetMrPercent,
+        labels: data.trend.map(function (t) { return t.label; }),
+        series: [{ name: 'MR %', values: data.trend.map(function (t) { return t.mrPercent; }), color: '#C7891F' }]
+      });
+
+      qsa('[data-review-sku]', body).forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          Dist.openReview(ctx, accountId, btn.getAttribute('data-review-sku'));
+        });
+      });
+
+      if (App.can('distribution.plan') && skuId) {
+        Drawer.setFooter('<button class="btn btn--secondary" id="review-close">Tutup</button>'
+          + '<button class="btn btn--primary" id="review-plan">Determine Plan Sell In</button>');
+        qs('#review-close').addEventListener('click', Drawer.close);
+        qs('#review-plan').addEventListener('click', function () { Dist.openPlan(ctx, accountId, skuId); });
+      } else {
+        Drawer.setFooter('<button class="btn btn--secondary" id="review-close">Tutup</button>');
+        qs('#review-close').addEventListener('click', Drawer.close);
+      }
+    }).catch(function (err) {
+      Drawer.setBody(UI.alert('danger', 'Gagal memuat review', err.message || ''));
+      Api.handle(err);
+    });
+  },
+
+  riskBreakdown: function (components) {
+    var labels = { mr: 'MR %', cover: 'Stock cover', shelf: 'Shelf life', trend: 'Tren sell out' };
+    return '<div class="stack stack--sm">' + Object.keys(components).map(function (key) {
+      var value = components[key];
+      var tone = value >= 65 ? 'danger' : (value >= 40 ? 'warning' : 'success');
+      return '<div><div class="row row--between" style="font-size:12px;margin-bottom:4px">'
+        + '<span>' + labels[key] + '</span><b class="num">' + UI.fmt.decimal(value, 0) + '/100</b></div>'
+        + UI.miniBar(value, tone) + '</div>';
+    }).join('') + '</div>';
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Determine Plan Sell In (modal)                                      */
+  /* ------------------------------------------------------------------ */
+  openPlan: function (ctx, accountId, skuId) {
+    Api.call('distribution.planPreview', {
+      accountId: accountId, skuId: skuId, filters: ctx.filters()
+    }).then(function (data) {
+      var b = data.breakdown || {};
+      Modal.open({
+        large: true,
+        title: 'Determine Plan Sell In',
+        sub: (data.accountName || '') + ' · ' + (data.skuName || ''),
+        body: [
+          '<div class="stack">',
+          '<div class="grid grid--3" style="gap:10px">',
+          UI.kpiCard({ label: 'Avg Sell Out', valueHtml: UI.fmt.decimal(data.avgSellOut, 1), unit: '/bln' }),
+          UI.kpiCard({ label: 'Avg Return', valueHtml: UI.fmt.decimal(data.avgReturn, 1), unit: '/bln' }),
+          UI.kpiCard({ label: 'MR %', valueHtml: UI.fmt.decimal(data.mrPercent, 2) + '<small>%</small>' }),
+          UI.kpiCard({ label: 'Current Stock', valueHtml: UI.fmt.number(data.currentStock), unit: 'qty' }),
+          UI.kpiCard({ label: 'Potensi', valueHtml: UI.statusBadge(data.potential, { potential: true }) }),
+          UI.kpiCard({ label: 'Risiko', valueHtml: UI.riskBadge(data.riskLevel, data.riskScore) }),
+          '</div>',
+
+          '<div class="formula-box">Recommended Allocation<br>'
+          + '= (AVG SELL OUT <b>' + UI.fmt.decimal(b.avgSellOut, 1) + '</b>'
+          + ' × ALLOCATION_FACTOR <b>' + b.allocationFactor + '</b>'
+          + ' × POTENTIAL_FACTOR <b>' + b.potentialFactor + '</b>)<br>'
+          + (b.stockDeducted ? '&nbsp;&nbsp;− CURRENT STOCK <b>' + UI.fmt.number(b.currentStock) + '</b><br>' : '')
+          + '&nbsp;&nbsp;− (AVG RETURN <b>' + UI.fmt.decimal(b.avgReturn, 1) + '</b> × RISK_FACTOR <b>'
+          + b.riskFactor + '</b>)<br>'
+          + '= <b>' + UI.fmt.decimal(b.raw, 2) + '</b> → dibulatkan kelipatan ' + b.rounding
+          + ', minimum ' + b.minimum + ' → <b>' + UI.fmt.number(data.recommendedAllocation) + '</b></div>',
+
+          data.recommendedAllocation === 0 ? UI.alert('warning', 'Sistem merekomendasikan tanpa sell in',
+            'Stock di account (' + UI.fmt.number(data.currentStock) + ') masih menutupi kebutuhan periode ini.') : '',
+
+          '<div class="field-row">',
+          '<div class="field"><label class="field__label">Rekomendasi sistem</label>',
+          '<input class="input" value="' + data.recommendedAllocation + '" disabled></div>',
+          '<div class="field" id="field-planned"><label class="field__label">Planned Sell In</label>',
+          '<input class="input" type="number" min="0" step="1" id="plan-value" value="'
+          + (data.existingPlan ? data.existingPlan.PLANNED_SELL_IN : data.recommendedAllocation) + '">',
+          '<span class="field__hint">Ubah nilai bila diperlukan penyesuaian manual.</span></div>',
+          '</div>',
+
+          '<div class="field" id="field-reason" hidden>',
+          '<label class="field__label">Alasan manual override <span class="text-danger">*</span></label>',
+          '<textarea class="textarea" id="plan-reason" placeholder="Contoh: program promo nasional, kapasitas gudang terbatas, permintaan khusus account"></textarea>',
+          '<span class="field__hint">Wajib diisi karena nilai berbeda dari rekomendasi sistem. '
+          + 'Rekomendasi awal, nilai akhir, alasan, user dan waktu akan disimpan ke audit log.</span></div>',
+
+          data.existingPlan ? UI.alert('info', 'Rencana sebelumnya',
+            'Plan ' + data.existingPlan.ALLOCATION_ID + ' (' + data.existingPlan.STATUS + ') tanggal '
+            + data.existingPlan.PLAN_DATE + ' dengan nilai ' + data.existingPlan.PLANNED_SELL_IN + '.') : '',
+          '</div>'
+        ].join(''),
+        actions: [
+          { label: 'Batal', tone: 'secondary' },
+          {
+            label: 'Terima rekomendasi', tone: 'secondary', close: false, onClick: function (body) {
+              qs('#plan-value', body).value = data.recommendedAllocation;
+              qs('#plan-value', body).dispatchEvent(new Event('input'));
+              return false;
+            }
+          },
+          {
+            label: 'Simpan rencana', tone: 'primary', close: false,
+            onClick: function (body) {
+              var planned = Number(qs('#plan-value', body).value);
+              var reason = qs('#plan-reason', body).value.trim();
+              if (!isFinite(planned) || planned < 0) {
+                Toast.warning('Nilai tidak valid', 'Planned Sell In harus angka >= 0.');
+                return false;
+              }
+              Api.call('distribution.savePlan', {
+                items: [{ accountId: accountId, skuId: skuId, plannedSellIn: planned, overrideReason: reason }],
+                status: 'DRAFT', filters: ctx.filters()
+              }).then(function () {
+                Modal.close();
+                // Drawer review ditutup agar tidak menampilkan angka lama.
+                if (Drawer.opened()) Drawer.close();
+                Toast.success('Rencana tersimpan',
+                  UI.fmt.number(planned) + ' qty untuk ' + data.accountName + ' – ' + data.skuName);
+                Dist.loadAllocation(ctx);
+              }).catch(function (err) {
+                if (err.code === 'OVERRIDE_REASON_REQUIRED') {
+                  qs('#field-reason', body).hidden = false;
+                  qs('#field-reason', body).classList.add('is-invalid');
+                  Toast.warning('Alasan wajib diisi', err.message);
+                } else {
+                  Api.handle(err, 'Gagal menyimpan rencana');
+                }
+              });
+              return false;
+            }
+          }
+        ],
+        onMount: function (body) {
+          var input = qs('#plan-value', body);
+          var toggleReason = function () {
+            var diff = Number(input.value) !== Number(data.recommendedAllocation);
+            qs('#field-reason', body).hidden = !diff || !data.overrideRequiresReason;
+          };
+          input.addEventListener('input', toggleReason);
+          toggleReason();
+        }
+      });
+    }).catch(function (err) { Api.handle(err, 'Gagal memuat rekomendasi'); });
+  },
+
+  bulkAccept: function (ctx) {
+    var ws = ctx.root.__ws;
+    var selected = Object.keys(ctx.root.__state.selected);
+    if (!ws || !selected.length) return;
+    var items = ws.rows.filter(function (row) { return selected.indexOf(row.key) !== -1; })
+      .map(function (row) {
+        return { accountId: row.accountId, skuId: row.skuId, plannedSellIn: row.recommendedAllocation };
+      });
+    Modal.confirm({
+      title: 'Terapkan rekomendasi sistem',
+      sub: items.length + ' baris akan disimpan sebagai rencana DRAFT.',
+      body: UI.alert('info', 'Tanpa manual override',
+        'Nilai yang disimpan sama persis dengan rekomendasi sistem sehingga tidak memerlukan alasan.'),
+      confirmLabel: 'Simpan ' + items.length + ' rencana'
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      Api.call('distribution.savePlan', { items: items, status: 'DRAFT', filters: ctx.filters() })
+        .then(function (res) {
+          Toast.success('Rencana tersimpan', (res.created + res.updated) + ' baris diperbarui.');
+          ctx.root.__state.selected = {};
+          Dist.loadAllocation(ctx);
+        }).catch(function (err) { Api.handle(err, 'Gagal menyimpan rencana'); });
+    });
+  },
+
+  exportCsv: function (ctx) {
+    Toast.info('Menyiapkan file', 'Export sedang diproses di server.');
+    Api.call('analytics.export', { type: 'DISTRIBUTION_PLANNING', filters: ctx.filters() })
+      .then(function (data) {
+        downloadCsv(data.filename, data.csv);
+        Toast.success('Export selesai', data.rowCount + ' baris diunduh.');
+      }).catch(function (err) { Api.handle(err, 'Export gagal'); });
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Clustering                                                          */
+  /* ------------------------------------------------------------------ */
+  loadCluster: function (ctx) {
+    ctx.el('[data-cluster-table]').innerHTML = UI.skeletonTable(6, 5);
+    ctx.el('[data-cluster-donut]').innerHTML = UI.skeletonChart(170);
+    Api.call('distribution.clusters', { filters: ctx.filters(), pageSize: 100 }).then(function (data) {
+      ctx.root.__cluster = data;
+      paint(function () {
+        Charts.render(ctx.el('[data-cluster-donut]'), {
+          type: 'donut', size: 150, totalLabel: 'ACCOUNT',
+          items: [
+            { id: 'HIGH', label: 'High Potential', value: data.distribution.HIGH, tone: 'success' },
+            { id: 'MEDIUM', label: 'Medium Potential', value: data.distribution.MEDIUM, tone: 'primary' },
+            { id: 'LOW', label: 'Low Potential', value: data.distribution.LOW, tone: 'muted' }
+          ],
+          onSelect: function (id) { Filters.set({ cluster: id }); }
+        });
+
+        var w = data.weights;
+        ctx.el('[data-cluster-formula]').innerHTML = [
+          '<div class="formula-box">SCORE = (SELL OUT × <b>' + w.sellOut + '</b>) + (SALES VALUE × <b>' + w.value + '</b>)'
+          + ' + (MR INVERSE × <b>' + w.mr + '</b>) + (STOCK MOVEMENT INVERSE × <b>' + w.movement + '</b>)<br>'
+          + 'HIGH bila score ≥ <b>' + data.thresholds.high + '</b> · MEDIUM bila ≥ <b>'
+          + data.thresholds.medium + '</b> · selain itu LOW</div>',
+          '<p class="caption" style="margin-top:12px">Clustering memakai beberapa indikator sekaligus, '
+          + 'bukan hanya volume penjualan, sehingga account dengan MR tinggi tidak otomatis masuk kategori potensial.</p>'
+        ].join('');
+
+        Dist.renderClusterTable(ctx, data);
+      });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat clustering');
+      ctx.el('[data-cluster-table]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+    });
+  },
+
+  renderClusterTable: function (ctx, data) {
+    var canApply = App.can('distribution.plan');
+    ctx.el('[data-cluster-count]').textContent = data.rows.length + ' account dianalisis';
+    if (!data.rows.length) {
+      ctx.el('[data-cluster-table]').innerHTML = UI.emptyState({
+        icon: 'layers', title: 'Belum ada data clustering',
+        desc: 'Clustering memerlukan transaksi sell out dan return pada periode terpilih.'
+      });
+      return;
+    }
+    var columns = [];
+    if (canApply) {
+      columns.push({
+        key: '_s', label: '', align: 'center', render: function (row) {
+          return row.changed ? '<label class="checkbox"><input type="checkbox" data-cluster-select="'
+            + UI.escapeHtml(row.accountId) + '" data-cluster-value="' + row.suggestedCluster + '"></label>'
+            : '<span class="text-muted">—</span>';
+        }
+      });
+    }
+    columns = columns.concat([
+      {
+        key: 'accountName', label: 'Account', render: function (r) {
+          return '<span class="t-strong">' + UI.escapeHtml(r.accountName) + '</span>'
+            + '<span class="table__cell-sub">' + UI.escapeHtml(r.accountCode) + ' · ' + UI.escapeHtml(r.region) + '</span>';
+        }
+      },
+      { key: 'avgSellOut', label: 'Avg Sell Out', align: 'right', render: function (r) { return UI.fmt.decimal(r.avgSellOut, 1); } },
+      { key: 'mrPercent', label: 'MR %', align: 'right', render: function (r) { return UI.fmt.percent(r.mrPercent, 2); } },
+      {
+        key: 'stockMovement', label: 'Stock Move', align: 'right', render: function (r) {
+          return (r.stockMovement > 0 ? '+' : '') + UI.fmt.number(r.stockMovement);
+        }
+      },
+      {
+        key: 'score', label: 'Skor Potensi', align: 'right', render: function (r) {
+          return '<span class="t-strong">' + UI.fmt.decimal(r.score, 1) + '</span>'
+            + UI.miniBar(r.score, r.score >= 65 ? 'success' : (r.score >= 35 ? 'primary' : 'warning'));
+        }
+      },
+      { key: 'currentCluster', label: 'Cluster saat ini', align: 'center', render: function (r) { return UI.statusBadge(r.currentCluster, { potential: true }); } },
+      {
+        key: 'suggestedCluster', label: 'Usulan sistem', align: 'center', render: function (r) {
+          return UI.statusBadge(r.suggestedCluster, { potential: true })
+            + (r.changed ? '<span class="table__cell-sub text-warning">berubah</span>' : '');
+        }
+      }
+    ]);
+    ctx.el('[data-cluster-table]').innerHTML = UI.table({ columns: columns, rows: data.rows, compact: true });
+
+    ctx.all('[data-cluster-select]').forEach(function (box) {
+      box.addEventListener('change', function () {
+        var id = box.getAttribute('data-cluster-select');
+        if (box.checked) ctx.root.__state.clusterSel[id] = box.getAttribute('data-cluster-value');
+        else delete ctx.root.__state.clusterSel[id];
+        var btn = ctx.el('[data-dist="apply-cluster"]');
+        btn.hidden = Object.keys(ctx.root.__state.clusterSel).length === 0;
+      });
+    });
+  },
+
+  applyCluster: function (ctx) {
+    var selection = ctx.root.__state.clusterSel;
+    var items = Object.keys(selection).map(function (accountId) {
+      return { accountId: accountId, cluster: selection[accountId], applyToPotential: true };
+    });
+    if (!items.length) return;
+    Modal.confirm({
+      title: 'Terapkan hasil clustering',
+      sub: items.length + ' account akan diperbarui.',
+      body: UI.alert('warning', 'Berpengaruh pada rekomendasi allocation',
+        'Potential level dipakai sebagai faktor pengali pada formula Recommended Allocation.'),
+      confirmLabel: 'Terapkan'
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      Api.call('distribution.applyCluster', { items: items }).then(function (res) {
+        Toast.success('Clustering diterapkan', res.updated + ' account diperbarui.');
+        ctx.root.__state.clusterSel = {};
+        Dist.loadCluster(ctx);
+      }).catch(function (err) { Api.handle(err, 'Gagal menerapkan clustering'); });
+    });
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Rencana tersimpan                                                   */
+  /* ------------------------------------------------------------------ */
+  loadPlans: function (ctx) {
+    ctx.el('[data-plans-table]').innerHTML = UI.skeletonTable(6, 6);
+    Api.call('distribution.plans', {
+      filters: ctx.filters(), page: ctx.root.__state.planPage || 1, pageSize: 25
+    }).then(function (data) {
+      ctx.root.__plans = data;
+      paint(function () { Dist.renderPlans(ctx, data); });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat rencana');
+      ctx.el('[data-plans-table]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+    });
+  },
+
+  renderPlans: function (ctx, data) {
+    var canApprove = App.can('distribution.approve');
+    var canPlan = App.can('distribution.plan');
+    var s = data.summary;
+    ctx.el('[data-plans-count]').textContent = UI.fmt.number(s.total) + ' rencana · '
+      + 'DRAFT ' + s.byStatus.DRAFT + ' · SUBMITTED ' + s.byStatus.SUBMITTED + ' · APPROVED ' + s.byStatus.APPROVED;
+
+    if (!data.rows.length) {
+      ctx.el('[data-plans-table]').innerHTML = UI.emptyState({
+        icon: 'file', title: 'Belum ada rencana tersimpan',
+        desc: 'Mulai dari tab Allocation Control, review performa account lalu tentukan plan sell in.'
+      });
+      ctx.el('[data-plans-pagination]').innerHTML = '';
+      ctx.el('[data-plan-actions]').innerHTML = '';
+      return;
+    }
+
+    var columns = [];
+    if (canPlan || canApprove) {
+      columns.push({
+        key: '_s', label: '', align: 'center', render: function (row) {
+          return '<label class="checkbox"><input type="checkbox" data-plan-select="'
+            + UI.escapeHtml(row.ALLOCATION_ID) + '"></label>';
+        }
+      });
+    }
+    columns = columns.concat([
+      { key: 'ALLOCATION_ID', label: 'ID', render: function (r) { return '<span class="mono">' + UI.escapeHtml(r.ALLOCATION_ID) + '</span>'; } },
+      { key: 'PLAN_DATE', label: 'Tanggal', render: function (r) { return UI.fmt.date(r.PLAN_DATE); } },
+      {
+        key: 'accountName', label: 'Account / SKU', render: function (r) {
+          return '<span class="t-strong">' + UI.escapeHtml(r.accountName) + '</span>'
+            + '<span class="table__cell-sub">' + UI.escapeHtml(r.skuName) + '</span>';
+        }
+      },
+      { key: 'MR_PERCENT', label: 'MR %', align: 'right', render: function (r) { return UI.fmt.percent(r.MR_PERCENT, 2); } },
+      { key: 'RECOMMENDED_ALLOCATION', label: 'Rekomendasi', align: 'right', render: function (r) { return UI.fmt.number(r.RECOMMENDED_ALLOCATION); } },
+      {
+        key: 'PLANNED_SELL_IN', label: 'Final', align: 'right', render: function (r) {
+          var override = r.OVERRIDE_REASON;
+          return '<span class="t-strong">' + UI.fmt.number(r.PLANNED_SELL_IN) + '</span>'
+            + (override ? '<span class="table__cell-sub text-warning" title="' + UI.escapeHtml(override)
+              + '">manual override</span>' : '');
+        }
+      },
+      { key: 'RISK_LEVEL', label: 'Risiko', align: 'center', render: function (r) { return UI.riskBadge(r.RISK_LEVEL); } },
+      { key: 'STATUS', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.STATUS); } },
+      { key: 'CREATED_BY', label: 'Dibuat', render: function (r) {
+          return UI.escapeHtml(r.CREATED_BY) + '<span class="table__cell-sub">' + UI.fmt.date(r.CREATED_AT) + '</span>';
+        } }
+    ]);
+
+    ctx.el('[data-plans-table]').innerHTML = UI.table({ columns: columns, rows: data.rows, compact: true });
+    ctx.el('[data-plans-pagination]').innerHTML = UI.pagination(data.meta);
+    ctx.el('[data-plan-actions]').innerHTML = [
+      canPlan ? '<button class="btn btn--secondary btn--sm" data-plan-action="SUBMITTED" disabled>Submit</button>' : '',
+      canApprove ? '<button class="btn btn--success btn--sm" data-plan-action="APPROVED" disabled>Approve</button>' : '',
+      canApprove ? '<button class="btn btn--danger btn--sm" data-plan-action="REJECTED" disabled>Reject</button>' : ''
+    ].join('');
+
+    var selected = {};
+    var syncButtons = function () {
+      var count = Object.keys(selected).length;
+      ctx.all('[data-plan-action]').forEach(function (btn) { btn.disabled = count === 0; });
+    };
+    ctx.all('[data-plan-select]').forEach(function (box) {
+      box.addEventListener('change', function () {
+        var id = box.getAttribute('data-plan-select');
+        if (box.checked) selected[id] = true; else delete selected[id];
+        syncButtons();
+      });
+    });
+    ctx.all('[data-plan-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var status = btn.getAttribute('data-plan-action');
+        var ids = Object.keys(selected);
+        if (!ids.length) return;
+        if (status === 'REJECTED') {
+          Modal.confirm({
+            title: 'Tolak rencana', sub: ids.length + ' rencana akan ditolak.',
+            body: '<div class="field"><label class="field__label">Alasan penolakan <span class="text-danger">*</span></label>'
+              + '<textarea class="textarea" id="reject-reason"></textarea></div>',
+            confirmLabel: 'Tolak rencana', tone: 'danger',
+            validate: function (body) {
+              var reason = qs('#reject-reason', body).value.trim();
+              if (!reason) { Toast.warning('Alasan wajib diisi'); return false; }
+              return reason;
+            }
+          }).then(function (reason) {
+            if (!reason) return;
+            Dist.changePlanStatus(ctx, ids, status, reason);
+          });
+          return;
+        }
+        Dist.changePlanStatus(ctx, ids, status, '');
+      });
+    });
+    ctx.all('[data-plans-pagination] .page-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        ctx.root.__state.planPage = Number(btn.getAttribute('data-page'));
+        Dist.loadPlans(ctx);
+      });
+    });
+  },
+
+  changePlanStatus: function (ctx, ids, status, reason) {
+    var action = status === 'SUBMITTED' ? 'distribution.submitPlan' : 'distribution.planStatus';
+    Api.call(action, { ids: ids, status: status, reason: reason }).then(function (res) {
+      Toast.success('Status diperbarui', res.updated + ' rencana menjadi ' + status + '.');
+      Dist.loadPlans(ctx);
+    }).catch(function (err) { Api.handle(err, 'Gagal memperbarui status'); });
+  }
+};
+</script>

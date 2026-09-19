@@ -1,0 +1,999 @@
+<script>
+/* =========================================================================
+   PROJECT MR DAIRY — Core frontend
+   Tanggung jawab frontend: rendering, interaction, filtering, state, feedback.
+   Seluruh business logic tetap berada di server (Apps Script).
+   ========================================================================= */
+
+/* ---------------------------------------------------------------------- */
+/* Storage aman (localStorage bisa diblokir pada beberapa konteks iframe)   */
+/* ---------------------------------------------------------------------- */
+var Store = (function () {
+  var memory = {};
+  function available() {
+    try { window.localStorage.setItem('__t', '1'); window.localStorage.removeItem('__t'); return true; }
+    catch (e) { return false; }
+  }
+  var ok = available();
+  return {
+    get: function (key, fallback) {
+      try {
+        var raw = ok ? window.localStorage.getItem(key) : memory[key];
+        return raw ? JSON.parse(raw) : (fallback === undefined ? null : fallback);
+      } catch (e) { return fallback === undefined ? null : fallback; }
+    },
+    set: function (key, value) {
+      var raw = JSON.stringify(value);
+      try { if (ok) window.localStorage.setItem(key, raw); else memory[key] = raw; } catch (e) { memory[key] = raw; }
+    },
+    remove: function (key) {
+      try { if (ok) window.localStorage.removeItem(key); } catch (e) { /* noop */ }
+      delete memory[key];
+    }
+  };
+})();
+
+var KEYS = { TOKEN: 'mrd.token', FILTERS: 'mrd.filters', SAVED: 'mrd.savedFilters', PAGE: 'mrd.lastPage' };
+
+/* ---------------------------------------------------------------------- */
+/* API client                                                              */
+/* ---------------------------------------------------------------------- */
+var Api = (function () {
+  var inflight = 0;
+
+  function call(action, payload) {
+    inflight++;
+    var promise = new Promise(function (resolve, reject) {
+      // Hook test lokal (dipakai harness Playwright). Produksi memakai google.script.run.
+      if (window.__MRD_LOCAL__) {
+        window.__MRD_LOCAL__(action, App.state.token, payload || {}).then(function (res) {
+          res && res.success ? resolve(res.data) : reject(normalize(res));
+        }).catch(function (err) { reject({ code: 'NETWORK_ERROR', message: String(err) }); });
+        return;
+      }
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        reject({ code: 'NO_BACKEND', message: 'Koneksi ke server Apps Script tidak tersedia.' });
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res && res.success) resolve(res.data);
+          else reject(normalize(res));
+        })
+        .withFailureHandler(function (err) {
+          reject({
+            code: 'SERVER_ERROR',
+            message: 'Server tidak dapat memproses permintaan. Periksa koneksi lalu coba lagi.',
+            detail: err && err.message ? err.message : String(err)
+          });
+        })
+        .api(action, App.state.token, payload || {});
+    });
+    promise.catch(function () { /* ditangani pemanggil */ }).then(function () { inflight--; });
+    return promise;
+  }
+
+  function normalize(res) {
+    if (res && res.error) return res.error;
+    return { code: 'UNKNOWN', message: 'Terjadi kesalahan yang tidak dikenali.' };
+  }
+
+  /** Penanganan error seragam: sesi habis → kembali ke login, lainnya → toast. */
+  function handle(error, context) {
+    if (!error) return;
+    if (error.code === 'AUTH_REQUIRED' || error.code === 'AUTH_EXPIRED') {
+      Toast.warning('Sesi berakhir', 'Silakan login kembali untuk melanjutkan.');
+      App.logout(true);
+      return;
+    }
+    Toast.error(context || 'Gagal memproses', error.message || 'Terjadi kesalahan pada server.');
+    if (error.detail) console.warn('[' + (error.code || 'ERROR') + '] ' + error.detail);
+  }
+
+  return { call: call, handle: handle };
+})();
+
+/* ---------------------------------------------------------------------- */
+/* Toast                                                                   */
+/* ---------------------------------------------------------------------- */
+var Toast = (function () {
+  function show(type, title, message, timeout) {
+    var host = document.getElementById('toast-host');
+    if (!host) return;
+    var el = document.createElement('div');
+    el.className = 'toast toast--' + type;
+    var iconName = type === 'success' ? 'check' : (type === 'error' ? 'alert'
+      : (type === 'warning' ? 'alert' : 'info'));
+    el.innerHTML = '<span class="toast__icon">' + UI.icon(iconName, 16) + '</span>'
+      + '<div style="min-width:0"><div class="toast__title">' + UI.escapeHtml(title) + '</div>'
+      + (message ? '<div class="toast__msg">' + UI.escapeHtml(message) + '</div>' : '') + '</div>'
+      + '<button aria-label="Tutup">' + UI.icon('x', 14) + '</button>';
+    el.querySelector('button').addEventListener('click', function () { el.remove(); });
+    host.appendChild(el);
+    setTimeout(function () {
+      el.style.transition = 'opacity .2s, transform .2s';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(6px)';
+      setTimeout(function () { el.remove(); }, 220);
+    }, timeout || (type === 'error' ? 6500 : 4000));
+  }
+  return {
+    show: show,
+    success: function (t, m) { show('success', t, m); },
+    error: function (t, m) { show('error', t, m); },
+    warning: function (t, m) { show('warning', t, m); },
+    info: function (t, m) { show('info', t, m); }
+  };
+})();
+
+/* ---------------------------------------------------------------------- */
+/* Overlay, Drawer, Modal                                                  */
+/* ---------------------------------------------------------------------- */
+var Overlay = (function () {
+  var users = 0;
+  function el() { return document.getElementById('overlay'); }
+  return {
+    show: function () { users++; el().classList.add('is-open'); document.body.classList.add('is-locked'); },
+    hide: function () {
+      users = Math.max(0, users - 1);
+      if (!users) { el().classList.remove('is-open'); document.body.classList.remove('is-locked'); }
+    },
+    reset: function () { users = 0; el().classList.remove('is-open'); document.body.classList.remove('is-locked'); }
+  };
+})();
+
+var Drawer = (function () {
+  var isOpen = false;
+  function node(id) { return document.getElementById(id); }
+
+  function open(config) {
+    var drawer = node('drawer');
+    drawer.classList.toggle('drawer--wide', !!config.wide);
+    node('drawer-title').textContent = config.title || 'Detail';
+    node('drawer-sub').textContent = config.sub || '';
+    node('drawer-body').innerHTML = config.body || '';
+    var foot = node('drawer-foot');
+    if (config.footer) { foot.innerHTML = config.footer; foot.hidden = false; }
+    else { foot.innerHTML = ''; foot.hidden = true; }
+    drawer.classList.add('is-open');
+    drawer.setAttribute('aria-hidden', 'false');
+    if (!isOpen) { Overlay.show(); isOpen = true; }
+    if (config.onMount) config.onMount(node('drawer-body'));
+    return node('drawer-body');
+  }
+
+  function close() {
+    var drawer = node('drawer');
+    drawer.classList.remove('is-open');
+    drawer.setAttribute('aria-hidden', 'true');
+    if (isOpen) { Overlay.hide(); isOpen = false; }
+  }
+
+  function setBody(html) { node('drawer-body').innerHTML = html; return node('drawer-body'); }
+  function setFooter(html) {
+    var foot = node('drawer-foot');
+    foot.innerHTML = html || '';
+    foot.hidden = !html;
+  }
+  function body() { return node('drawer-body'); }
+  function opened() { return isOpen; }
+
+  return { open: open, close: close, setBody: setBody, setFooter: setFooter, body: body, opened: opened };
+})();
+
+var Modal = (function () {
+  var isOpen = false;
+  var resolver = null;
+
+  function open(config) {
+    var modal = document.getElementById('modal');
+    modal.classList.toggle('modal--lg', !!config.large);
+    document.getElementById('modal-title').textContent = config.title || '';
+    document.getElementById('modal-sub').textContent = config.sub || '';
+    document.getElementById('modal-body').innerHTML = config.body || '';
+    document.getElementById('modal-foot').innerHTML = (config.actions || []).map(function (action, idx) {
+      return '<button class="btn btn--' + (action.tone || 'secondary') + '" data-modal-action="' + idx + '">'
+        + UI.escapeHtml(action.label) + '</button>';
+    }).join('');
+    document.getElementById('modal-foot').querySelectorAll('[data-modal-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = (config.actions || [])[Number(btn.getAttribute('data-modal-action'))];
+        if (action && action.onClick) {
+          var result = action.onClick(document.getElementById('modal-body'));
+          if (result === false) return;
+        }
+        if (!action || action.close !== false) close();
+      });
+    });
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    if (!isOpen) { Overlay.show(); isOpen = true; }
+    if (config.onMount) config.onMount(document.getElementById('modal-body'));
+    var firstInput = document.getElementById('modal-body').querySelector('input,textarea,select');
+    if (firstInput) setTimeout(function () { firstInput.focus(); }, 60);
+  }
+
+  function close() {
+    var modal = document.getElementById('modal');
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    if (isOpen) { Overlay.hide(); isOpen = false; }
+    if (resolver) { resolver(false); resolver = null; }
+  }
+
+  /** Konfirmasi berbasis Promise. */
+  function confirm(config) {
+    return new Promise(function (resolve) {
+      open({
+        title: config.title || 'Konfirmasi',
+        sub: config.sub || '',
+        body: config.body || '',
+        actions: [
+          { label: config.cancelLabel || 'Batal', tone: 'secondary', onClick: function () { resolve(false); } },
+          {
+            label: config.confirmLabel || 'Lanjutkan', tone: config.tone || 'primary',
+            onClick: function (body) {
+              if (config.validate) {
+                var value = config.validate(body);
+                if (value === false) return false;
+                resolve(value);
+                return true;
+              }
+              resolve(true);
+            }
+          }
+        ]
+      });
+    });
+  }
+
+  function opened() { return isOpen; }
+  return { open: open, close: close, confirm: confirm, opened: opened };
+})();
+
+/* ---------------------------------------------------------------------- */
+/* Util                                                                    */
+/* ---------------------------------------------------------------------- */
+function debounce(fn, wait) {
+  var timer = null;
+  return function () {
+    var args = arguments, ctx = this;
+    clearTimeout(timer);
+    timer = setTimeout(function () { fn.apply(ctx, args); }, wait || 280);
+  };
+}
+
+function qs(selector, root) { return (root || document).querySelector(selector); }
+function qsa(selector, root) { return Array.prototype.slice.call((root || document).querySelectorAll(selector)); }
+
+function todayIso(offsetDays) {
+  var d = new Date();
+  if (offsetDays) d.setDate(d.getDate() + offsetDays);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function monthsAgoIso(months) {
+  var d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - (months - 1));
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+}
+
+/** Unduh CSV (Excel compatible: BOM UTF-8 + CRLF dari server). */
+function downloadCsv(filename, csv) {
+  try {
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    return true;
+  } catch (e) {
+    Toast.error('Unduhan gagal', 'Browser memblokir unduhan file. Coba buka aplikasi di tab baru.');
+    return false;
+  }
+}
+
+/** requestAnimationFrame guard agar transisi tetap halus. */
+function paint(fn) {
+  if (window.requestAnimationFrame) window.requestAnimationFrame(fn);
+  else setTimeout(fn, 16);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Global Filter                                                           */
+/* ---------------------------------------------------------------------- */
+var Filters = (function () {
+
+  var DEFAULT = {
+    dateFrom: '', dateTo: '', region: '', area: '', accountIds: [], skuIds: [],
+    cluster: '', potential: '', category: '', risk: '', status: '', q: ''
+  };
+
+  var state = Object.assign({}, DEFAULT);
+  var containers = [];
+
+  function init() {
+    var stored = Store.get(KEYS.FILTERS);
+    if (stored) state = Object.assign({}, DEFAULT, stored);
+    if (!state.dateFrom) state.dateFrom = monthsAgoIso(App.state.settings.analysisMonths || 6);
+    if (!state.dateTo) state.dateTo = todayIso();
+  }
+
+  function get(fields) {
+    var out = {};
+    (fields || Object.keys(state)).forEach(function (field) {
+      var value = state[field];
+      if (value === '' || value === null || (Array.isArray(value) && !value.length)) return;
+      out[field] = value;
+    });
+    return out;
+  }
+
+  function activeCount(fields) {
+    return Object.keys(get(fields)).filter(function (key) {
+      return ['dateFrom', 'dateTo'].indexOf(key) === -1;
+    }).length;
+  }
+
+  function optionsHtml(items, selected, placeholder) {
+    return '<option value="">' + UI.escapeHtml(placeholder) + '</option>' + items.map(function (item) {
+      var value = typeof item === 'string' ? item : item.value;
+      var label = typeof item === 'string' ? item.replace(/_/g, ' ') : item.label;
+      return '<option value="' + UI.escapeHtml(value) + '"' + (selected === value ? ' selected' : '') + '>'
+        + UI.escapeHtml(label) + '</option>';
+    }).join('');
+  }
+
+  function controlHtml(field) {
+    var master = App.state.master || { accounts: [], skus: [], accountFilters: {}, skuFilters: {} };
+    var af = master.accountFilters || {};
+    var sf = master.skuFilters || {};
+    switch (field) {
+      case 'dateRange':
+        return '<input class="input" type="date" data-filter="dateFrom" value="' + (state.dateFrom || '') + '"'
+          + ' style="max-width:150px" aria-label="Dari tanggal">'
+          + '<span class="caption">s/d</span>'
+          + '<input class="input" type="date" data-filter="dateTo" value="' + (state.dateTo || '') + '"'
+          + ' style="max-width:150px" aria-label="Sampai tanggal">';
+      case 'region':
+        return '<select class="select" data-filter="region" style="max-width:150px">'
+          + optionsHtml(af.regions || [], state.region, 'Semua region') + '</select>';
+      case 'area':
+        return '<select class="select" data-filter="area" style="max-width:150px">'
+          + optionsHtml(af.areas || [], state.area, 'Semua area') + '</select>';
+      case 'account':
+        return '<select class="select" data-filter="accountIds" style="max-width:190px">'
+          + optionsHtml((master.accounts || []).map(function (a) { return { value: a.id, label: a.name }; }),
+            (state.accountIds || [])[0], 'Semua account') + '</select>';
+      case 'sku':
+        return '<select class="select" data-filter="skuIds" style="max-width:190px">'
+          + optionsHtml((master.skus || []).map(function (s) { return { value: s.id, label: s.name }; }),
+            (state.skuIds || [])[0], 'Semua SKU') + '</select>';
+      case 'cluster':
+        return '<select class="select" data-filter="cluster" style="max-width:140px">'
+          + optionsHtml(['HIGH', 'MEDIUM', 'LOW'], state.cluster, 'Semua cluster') + '</select>';
+      case 'potential':
+        return '<select class="select" data-filter="potential" style="max-width:150px">'
+          + optionsHtml(['HIGH', 'MEDIUM', 'LOW'], state.potential, 'Semua potensi') + '</select>';
+      case 'category':
+        return '<select class="select" data-filter="category" style="max-width:150px">'
+          + optionsHtml(sf.categories || [], state.category, 'Semua kategori') + '</select>';
+      case 'risk':
+        return '<select class="select" data-filter="risk" style="max-width:130px">'
+          + optionsHtml(['HIGH', 'MEDIUM', 'LOW'], state.risk, 'Semua risiko') + '</select>';
+      case 'mrStatus':
+        return '<select class="select" data-filter="status" style="max-width:170px">'
+          + optionsHtml((App.state.enums.mrStatus || []), state.status, 'Semua status') + '</select>';
+      case 'planStatus':
+        return '<select class="select" data-filter="status" style="max-width:160px">'
+          + optionsHtml((App.state.enums.allocationStatus || []), state.status, 'Semua status') + '</select>';
+      case 'search':
+        return '<span class="search-wrap">' + UI.icon('search', 14)
+          + '<input class="input input--search" type="search" data-filter="q" placeholder="Cari account, SKU, nomor…" '
+          + 'value="' + UI.escapeHtml(state.q || '') + '"></span>';
+      default:
+        return '';
+    }
+  }
+
+  /** Render filter bar ke dalam slot halaman. */
+  function render(container, fields) {
+    if (!container) return;
+    containers = containers.filter(function (c) { return document.body.contains(c.el) && c.el !== container; });
+    containers.push({ el: container, fields: fields });
+
+    var saved = Store.get(KEYS.SAVED, []);
+    container.className = 'filterbar';
+    container.innerHTML = fields.map(controlHtml).join('')
+      + '<div class="filterbar__actions">'
+      + (saved.length ? '<select class="select" data-filter-saved style="max-width:150px">'
+        + '<option value="">Filter tersimpan</option>'
+        + saved.map(function (item, idx) { return '<option value="' + idx + '">' + UI.escapeHtml(item.name) + '</option>'; }).join('')
+        + '</select>' : '')
+      + '<button class="btn btn--ghost btn--sm" data-filter-save>' + UI.icon('save', 14) + ' Simpan</button>'
+      + '<button class="btn btn--secondary btn--sm" data-filter-reset>Reset</button>'
+      + '<button class="btn btn--primary btn--sm" data-filter-apply>Terapkan'
+      + (activeCount(fieldsToKeys(fields)) ? ' <span class="filter-count">' + activeCount(fieldsToKeys(fields)) + '</span>' : '')
+      + '</button></div>';
+
+    bind(container, fields);
+  }
+
+  function fieldsToKeys(fields) {
+    var map = {
+      dateRange: ['dateFrom', 'dateTo'], region: ['region'], area: ['area'], account: ['accountIds'],
+      sku: ['skuIds'], cluster: ['cluster'], potential: ['potential'], category: ['category'],
+      risk: ['risk'], mrStatus: ['status'], planStatus: ['status'], search: ['q']
+    };
+    var keys = [];
+    (fields || []).forEach(function (f) { keys = keys.concat(map[f] || []); });
+    return keys;
+  }
+
+  function bind(container, fields) {
+    qsa('[data-filter]', container).forEach(function (input) {
+      var field = input.getAttribute('data-filter');
+      var handler = function () {
+        var value = input.value;
+        if (field === 'accountIds' || field === 'skuIds') state[field] = value ? [value] : [];
+        else state[field] = value;
+        if (input.type === 'search') applyDebounced();
+      };
+      input.addEventListener('change', handler);
+      if (input.type === 'search') input.addEventListener('input', handler);
+    });
+
+    var applyBtn = qs('[data-filter-apply]', container);
+    if (applyBtn) applyBtn.addEventListener('click', apply);
+    var resetBtn = qs('[data-filter-reset]', container);
+    if (resetBtn) resetBtn.addEventListener('click', reset);
+    var saveBtn = qs('[data-filter-save]', container);
+    if (saveBtn) saveBtn.addEventListener('click', saveCurrent);
+    var savedSelect = qs('[data-filter-saved]', container);
+    if (savedSelect) savedSelect.addEventListener('change', function () {
+      var saved = Store.get(KEYS.SAVED, [])[Number(savedSelect.value)];
+      if (!saved) return;
+      state = Object.assign({}, DEFAULT, saved.filters);
+      persist();
+      rerenderAll();
+      App.refresh();
+      Toast.info('Filter diterapkan', 'Menggunakan filter tersimpan "' + saved.name + '".');
+    });
+  }
+
+  var applyDebounced = debounce(function () { apply(); }, 420);
+
+  function apply() {
+    persist();
+    rerenderAll();
+    App.refresh();
+    if (window.innerWidth <= 768 && Drawer.opened()) Drawer.close();
+  }
+
+  function reset() {
+    state = Object.assign({}, DEFAULT, {
+      dateFrom: monthsAgoIso(App.state.settings.analysisMonths || 6),
+      dateTo: todayIso()
+    });
+    persist();
+    rerenderAll();
+    App.refresh();
+  }
+
+  function set(patch, silent) {
+    Object.assign(state, patch);
+    persist();
+    rerenderAll();
+    if (!silent) App.refresh();
+  }
+
+  function persist() { Store.set(KEYS.FILTERS, state); }
+
+  function rerenderAll() {
+    containers = containers.filter(function (c) { return document.body.contains(c.el); });
+    containers.forEach(function (c) { render(c.el, c.fields); });
+  }
+
+  function saveCurrent() {
+    Modal.open({
+      title: 'Simpan filter',
+      sub: 'Filter tersimpan berlaku di perangkat ini.',
+      body: '<div class="field"><label class="field__label">Nama filter</label>'
+        + '<input class="input" id="filter-name" placeholder="mis. MR tinggi Jakarta"></div>',
+      actions: [
+        { label: 'Batal', tone: 'secondary' },
+        {
+          label: 'Simpan', tone: 'primary',
+          onClick: function (body) {
+            var name = qs('#filter-name', body).value.trim();
+            if (!name) { Toast.warning('Nama wajib diisi'); return false; }
+            var saved = Store.get(KEYS.SAVED, []);
+            saved.push({ name: name, filters: Object.assign({}, state) });
+            Store.set(KEYS.SAVED, saved.slice(-8));
+            rerenderAll();
+            Toast.success('Filter disimpan', name);
+          }
+        }
+      ]
+    });
+  }
+
+  /** Filter drawer untuk mobile. */
+  function openMobile() {
+    var page = App.pages[App.state.page];
+    var fields = (page && page.filters) || ['dateRange', 'search'];
+    Drawer.open({
+      title: 'Filter',
+      sub: 'Sesuaikan data yang ditampilkan',
+      body: '<div id="mobile-filter-slot"></div>',
+      onMount: function (body) {
+        var slot = qs('#mobile-filter-slot', body);
+        render(slot, fields);
+        slot.classList.add('is-drawer');
+        slot.style.display = 'flex';
+        slot.style.flexDirection = 'column';
+        slot.style.alignItems = 'stretch';
+        qsa('.select,.input', slot).forEach(function (el) { el.style.maxWidth = 'none'; });
+      }
+    });
+  }
+
+  return {
+    init: init, get: get, render: render, apply: apply, reset: reset, set: set,
+    state: function () { return state; }, activeCount: activeCount, openMobile: openMobile,
+    keysFor: fieldsToKeys
+  };
+})();
+
+/* ---------------------------------------------------------------------- */
+/* App                                                                     */
+/* ---------------------------------------------------------------------- */
+var App = (function () {
+
+  var state = {
+    token: null, user: null, permissions: {}, navigation: [], master: null,
+    enums: {}, settings: {}, app: {}, page: null, params: {}, booted: false
+  };
+
+  var pages = {};
+  var mounted = {};
+
+  function registerPage(id, definition) { pages[id] = definition; }
+
+  function can(permission) { return !!state.permissions[permission]; }
+
+  /* ---- Screens ---- */
+  function showScreen(name) {
+    ['boot-screen', 'setup-screen', 'login-screen', 'app'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.hidden = (id !== name);
+    });
+  }
+
+  /* ---- Setup screen ---- */
+  function renderSetupStatus(status) {
+    var host = document.getElementById('setup-status-list');
+    if (!host) return;
+    var rows = [
+      { label: 'Database', value: status && status.database ? status.database.label : 'NOT READY',
+        detail: status && status.database ? status.database.detail : '' },
+      { label: 'Sheets', value: status && status.sheets ? status.sheets.label : 'NOT READY',
+        detail: status && status.sheets ? status.sheets.found + '/' + status.sheets.total + ' sheet' : '' },
+      { label: 'Configuration', value: status && status.configuration ? status.configuration.label : 'NOT READY',
+        detail: status && status.configuration ? status.configuration.settings + ' business rule' : '' },
+      { label: 'Users', value: status && status.users ? status.users.label : 'NOT READY',
+        detail: status && status.users ? status.users.total + ' user' : '' },
+      { label: 'Demo Data', value: status && status.demoData ? status.demoData.label : 'EMPTY',
+        detail: status && status.demoData ? status.demoData.accounts + ' account · ' + status.demoData.sales + ' baris sales' : '' }
+    ];
+    host.innerHTML = rows.map(function (row) {
+      var tone = row.value === 'READY' ? 'success' : (row.value === 'EMPTY' ? 'warning' : 'danger');
+      return '<div class="status-row"><div><div class="status-row__label">' + row.label + '</div>'
+        + '<div class="status-row__detail">' + UI.escapeHtml(row.detail || '') + '</div></div>'
+        + UI.badge(row.value, tone) + '</div>';
+    }).join('');
+  }
+
+  function bindSetupScreen() {
+    var runBtn = document.getElementById('btn-run-setup');
+    var refreshBtn = document.getElementById('btn-refresh-status');
+    if (runBtn) runBtn.addEventListener('click', function () {
+      runBtn.disabled = true;
+      runBtn.innerHTML = '<span class="spinner"></span> Membuat database…';
+      Api.call('system.setup', {}).then(function (data) {
+        renderSetupStatus(data.status);
+        Toast.success('Database siap', 'Seluruh sheet dan konfigurasi berhasil dibuat.');
+        setTimeout(function () { showScreen('login-screen'); bootApp(); }, 900);
+      }).catch(function (err) {
+        Api.handle(err, 'Inisialisasi database gagal');
+        runBtn.disabled = false;
+        runBtn.innerHTML = 'Initialize Database';
+      });
+    });
+    if (refreshBtn) refreshBtn.addEventListener('click', function () {
+      Api.call('system.status', {}).then(function (status) {
+        renderSetupStatus(status);
+        if (status.sheets && status.sheets.ready && status.users && status.users.ready) {
+          Toast.success('Database siap', 'Silakan login.');
+          showScreen('login-screen');
+        } else {
+          Toast.info('Belum siap', 'Database masih memerlukan inisialisasi.');
+        }
+      }).catch(function (err) { Api.handle(err, 'Gagal membaca status'); });
+    });
+  }
+
+  /* ---- Login ---- */
+  function bindLogin() {
+    var form = document.getElementById('login-form');
+    if (!form) return;
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      submitLogin();
+    });
+    qsa('.demo-account').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        qs('#login-username').value = btn.getAttribute('data-u');
+        qs('#login-password').value = btn.getAttribute('data-p');
+        qs('#login-password').focus();
+      });
+    });
+    var toggle = document.getElementById('toggle-password');
+    if (toggle) toggle.addEventListener('click', function () {
+      var input = qs('#login-password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  function submitLogin() {
+    var username = qs('#login-username').value.trim();
+    var password = qs('#login-password').value;
+    var errorBox = qs('#login-error');
+    var submit = qs('#login-submit');
+    errorBox.hidden = true;
+
+    if (!username || !password) {
+      qs('#login-error-text').textContent = 'Username dan password wajib diisi.';
+      errorBox.hidden = false;
+      return;
+    }
+    submit.disabled = true;
+    submit.innerHTML = '<span class="spinner"></span> Memproses…';
+
+    Api.call('auth.login', { username: username, password: password }).then(function (session) {
+      Store.set(KEYS.TOKEN, session.token);
+      applySession(session);
+      qs('#login-password').value = '';
+      enterApp();
+    }).catch(function (err) {
+      qs('#login-error-text').textContent = err.message || 'Login gagal.';
+      errorBox.hidden = false;
+      submit.disabled = false;
+      submit.innerHTML = '<span id="login-submit-label">Masuk</span>';
+    });
+  }
+
+  function applySession(session) {
+    state.token = session.token;
+    state.user = session.user;
+    state.permissions = session.permissions || {};
+    state.navigation = session.navigation || [];
+    state.app = session.app || {};
+  }
+
+  function logout(silent) {
+    var token = state.token;
+    state.token = null;
+    Store.remove(KEYS.TOKEN);
+    if (token && !silent) Api.call('auth.logout', { token: token }).catch(function () { });
+    else if (token) Api.call('auth.logout', { token: token }).catch(function () { });
+    state.user = null;
+    mounted = {};
+    Overlay.reset();
+    Drawer.close();
+    Modal.close();
+    showScreen('login-screen');
+    var submit = qs('#login-submit');
+    if (submit) { submit.disabled = false; submit.innerHTML = '<span id="login-submit-label">Masuk</span>'; }
+  }
+
+  /* ---- Navigasi ---- */
+  function renderNav() {
+    var nav = document.getElementById('sidebar-nav');
+    var iconMap = {
+      dashboard: 'grid', distribution: 'target', mr: 'clipboard', sop: 'book',
+      monitoring: 'kanban', analytics: 'chart', master: 'database', audit: 'history', settings: 'settings'
+    };
+    var groups = [
+      { label: 'Ringkasan', items: ['dashboard'] },
+      { label: 'Operasional', items: ['distribution', 'mr', 'sop', 'monitoring'] },
+      { label: 'Wawasan', items: ['analytics'] },
+      { label: 'Administrasi', items: ['master', 'audit', 'settings'] }
+    ];
+    var available = {};
+    state.navigation.forEach(function (item) { available[item.id] = item; });
+
+    nav.innerHTML = groups.map(function (group) {
+      var items = group.items.filter(function (id) { return available[id]; });
+      if (!items.length) return '';
+      return '<div class="sidebar__group-label">' + group.label + '</div>' + items.map(function (id) {
+        var item = available[id];
+        return '<button class="nav-item" data-nav="' + id + '">'
+          + UI.icon(iconMap[id] || 'grid', 16) + '<span>' + UI.escapeHtml(item.label) + '</span>'
+          + '<span class="nav-item__badge" data-nav-badge="' + id + '" hidden></span></button>';
+      }).join('');
+    }).join('');
+
+    nav.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-nav]');
+      if (btn) navigate(btn.getAttribute('data-nav'));
+    });
+  }
+
+  function setNavBadge(pageId, value) {
+    var badge = qs('[data-nav-badge="' + pageId + '"]');
+    if (!badge) return;
+    if (value) { badge.textContent = value; badge.hidden = false; }
+    else badge.hidden = true;
+  }
+
+  function navigate(pageId, params) {
+    var page = pages[pageId];
+    if (!page) { Toast.warning('Halaman tidak tersedia'); return; }
+    if (page.permission && !can(page.permission)) {
+      Toast.warning('Akses ditolak', 'Role Anda tidak memiliki akses ke halaman ini.');
+      return;
+    }
+    state.page = pageId;
+    state.params = params || {};
+    Store.set(KEYS.PAGE, pageId);
+
+    // Tutup drawer/modal agar tidak tertinggal di atas halaman baru.
+    Drawer.close();
+    Modal.close();
+
+    qsa('.page').forEach(function (el) { el.classList.remove('is-active'); });
+    var section = document.getElementById('page-' + pageId);
+    if (section) section.classList.add('is-active');
+
+    qsa('[data-nav]').forEach(function (btn) {
+      btn.classList.toggle('is-active', btn.getAttribute('data-nav') === pageId);
+    });
+
+    document.getElementById('topbar-title').textContent = page.title || pageId;
+    document.getElementById('breadcrumb').innerHTML = (page.breadcrumb || ['MR Dairy', page.title])
+      .map(function (part) { return '<span>' + UI.escapeHtml(part) + '</span>'; }).join('');
+
+    if (window.innerWidth <= 1024) closeSidebar();
+    document.querySelector('.content').scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+
+    var slot = section ? section.querySelector('[data-filter-slot]') : null;
+    if (slot && page.filters) Filters.render(slot, page.filters);
+
+    if (!mounted[pageId] && page.mount) {
+      page.mount(makeContext(pageId));
+      mounted[pageId] = true;
+    }
+    if (page.load) page.load(makeContext(pageId));
+    Charts.hideTip();
+  }
+
+  function makeContext(pageId) {
+    var section = document.getElementById('page-' + pageId);
+    var page = pages[pageId] || {};
+    return {
+      id: pageId,
+      root: section,
+      el: function (selector) { return section.querySelector(selector); },
+      all: function (selector) { return qsa(selector, section); },
+      /**
+       * Hanya mengirim filter yang benar-benar ditampilkan halaman ini.
+       * Mencegah filter dari halaman lain (mis. status MR) ikut menyaring
+       * data secara tidak terlihat oleh user.
+       */
+      filters: function () {
+        return page.filters ? Filters.get(Filters.keysFor(page.filters)) : Filters.get();
+      },
+      params: state.params,
+      can: can
+    };
+  }
+
+  function refresh() {
+    if (!state.page) return;
+    var page = pages[state.page];
+    if (page && page.load) page.load(makeContext(state.page));
+  }
+
+  /* ---- Sidebar mobile ---- */
+  function openSidebar() {
+    document.getElementById('sidebar').classList.add('is-open');
+    Overlay.show();
+  }
+  function closeSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar.classList.contains('is-open')) { sidebar.classList.remove('is-open'); Overlay.hide(); }
+  }
+
+  /* ---- Profil ---- */
+  function openProfile() {
+    var user = state.user || {};
+    Drawer.open({
+      title: user.NAME || 'Profil',
+      sub: '@' + (user.USERNAME || '') + ' · ' + (user.ROLE || ''),
+      body: '<div class="stack">'
+        + '<div class="panel"><div class="meta-grid">'
+        + UI.metaItem('Nama', UI.escapeHtml(user.NAME || '-'))
+        + UI.metaItem('Username', UI.escapeHtml(user.USERNAME || '-'))
+        + UI.metaItem('Role', UI.statusBadge(user.ROLE, { tone: 'info' }))
+        + UI.metaItem('Email', UI.escapeHtml(user.EMAIL || '-'))
+        + '</div></div>'
+        + '<div class="card"><div class="card__head"><span class="card-title">Ubah password</span></div>'
+        + '<div class="card__body"><div class="stack">'
+        + '<div class="field"><label class="field__label">Password saat ini</label>'
+        + '<input class="input" type="password" id="pwd-current" autocomplete="current-password"></div>'
+        + '<div class="field"><label class="field__label">Password baru</label>'
+        + '<input class="input" type="password" id="pwd-new" autocomplete="new-password">'
+        + '<span class="field__hint">Minimal 6 karakter.</span></div>'
+        + '<button class="btn btn--primary" id="btn-change-password">Simpan password</button>'
+        + '</div></div></div>'
+        + '<div class="card"><div class="card__body">'
+        + '<div class="row row--between"><div><div class="card-title">Keluar dari aplikasi</div>'
+        + '<div class="caption">Sesi akan diakhiri pada perangkat ini.</div></div>'
+        + '<button class="btn btn--danger" id="btn-logout">' + UI.icon('logout', 14) + ' Logout</button></div>'
+        + '</div></div></div>',
+      onMount: function (body) {
+        qs('#btn-logout', body).addEventListener('click', function () {
+          Drawer.close();
+          logout();
+        });
+        qs('#btn-change-password', body).addEventListener('click', function () {
+          var current = qs('#pwd-current', body).value;
+          var next = qs('#pwd-new', body).value;
+          if (!current || !next) { Toast.warning('Lengkapi data', 'Password lama dan baru wajib diisi.'); return; }
+          Api.call('auth.changePassword', {
+            token: state.token, currentPassword: current, newPassword: next
+          }).then(function () {
+            Toast.success('Password diperbarui');
+            qs('#pwd-current', body).value = '';
+            qs('#pwd-new', body).value = '';
+          }).catch(function (err) { Api.handle(err, 'Gagal mengubah password'); });
+        });
+      }
+    });
+  }
+
+  /* ---- Notifikasi ringkas ---- */
+  function openNotifications() {
+    Drawer.open({
+      title: 'Perlu tindak lanjut',
+      sub: 'Ringkasan item yang menunggu aksi Anda',
+      body: '<div class="stack" id="notif-body">' + UI.skeletonTable(4, 2) + '</div>',
+      onMount: function (body) {
+        Api.call('dashboard.summary', { filters: Filters.get() }).then(function (data) {
+          var items = data.attention || [];
+          qs('#notif-body', body).innerHTML = items.length ? items.map(function (item) {
+            return '<div class="card"><div class="card__body" style="padding:14px 16px">'
+              + '<div class="row" style="gap:10px;align-items:flex-start">'
+              + UI.badge(item.severity === 'danger' ? 'URGENT' : (item.severity === 'warning' ? 'PERHATIAN' : 'INFO'),
+                item.severity === 'danger' ? 'danger' : (item.severity === 'warning' ? 'warning' : 'info'))
+              + '<div style="min-width:0"><div class="card-title">' + UI.escapeHtml(item.title) + '</div>'
+              + '<div class="caption" style="margin-top:2px">' + UI.escapeHtml(item.description) + '</div>'
+              + (item.action ? '<button class="btn btn--secondary btn--sm" style="margin-top:10px" '
+                + 'data-notif-page="' + item.action.page + '">' + UI.escapeHtml(item.action.label) + '</button>' : '')
+              + '</div></div></div></div>';
+          }).join('') : UI.emptyState({
+            icon: 'check', title: 'Semua terkendali',
+            desc: 'Tidak ada item yang memerlukan tindak lanjut segera.'
+          });
+          qsa('[data-notif-page]', body).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              Drawer.close();
+              navigate(btn.getAttribute('data-notif-page'));
+            });
+          });
+        }).catch(function (err) {
+          qs('#notif-body', body).innerHTML = UI.alert('danger', 'Gagal memuat', err.message);
+        });
+      }
+    });
+  }
+
+  /* ---- Boot ---- */
+  function bindShell() {
+    document.getElementById('overlay').addEventListener('click', function () {
+      Drawer.close(); Modal.close(); closeSidebar();
+    });
+    document.getElementById('drawer-close').addEventListener('click', Drawer.close);
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { Drawer.close(); Modal.close(); closeSidebar(); }
+    });
+    document.getElementById('btn-menu').addEventListener('click', openSidebar);
+    document.getElementById('user-chip').addEventListener('click', openProfile);
+    document.getElementById('btn-notification').addEventListener('click', openNotifications);
+    document.getElementById('btn-filter-mobile').addEventListener('click', Filters.openMobile);
+    document.getElementById('btn-refresh').addEventListener('click', function () {
+      refresh();
+      Toast.info('Memuat ulang', 'Data terbaru sedang diambil dari server.');
+    });
+  }
+
+  function loadPages() {
+    (window.__MRD_PAGES__ || []).forEach(function (entry) { registerPage(entry[0], entry[1]); });
+  }
+
+  function enterApp() {
+    showScreen('app');
+    document.getElementById('user-initials').textContent = state.user.INITIALS || '–';
+    document.getElementById('user-name').textContent = state.user.NAME || state.user.USERNAME;
+    document.getElementById('user-role').textContent = state.user.ROLE;
+    document.getElementById('brand-name').textContent = state.app.name || 'PROJECT MR DAIRY';
+    renderNav();
+
+    // Tahap 1: langsung tampilkan kerangka + master data ringan.
+    Api.call('system.master', {}).then(function (data) {
+      state.master = data.master;
+      state.enums = data.enums;
+      state.settings = data.settings;
+      Filters.init();
+      var last = Store.get(KEYS.PAGE);
+      var first = (state.navigation[0] || {}).id || 'dashboard';
+      navigate(pages[last] && state.permissions[(pages[last] || {}).permission || 'dashboard.view'] ? last : first);
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat master data');
+      Filters.init();
+      navigate('dashboard');
+    });
+  }
+
+  function bootApp() {
+    var token = Store.get(KEYS.TOKEN);
+    if (!token) { showScreen('login-screen'); return; }
+    state.token = token;
+    Api.call('auth.session', { token: token }).then(function (session) {
+      if (!session) { Store.remove(KEYS.TOKEN); state.token = null; showScreen('login-screen'); return; }
+      applySession(session);
+      enterApp();
+    }).catch(function () {
+      Store.remove(KEYS.TOKEN);
+      state.token = null;
+      showScreen('login-screen');
+    });
+  }
+
+  function boot() {
+    loadPages();
+    bindShell();
+    bindLogin();
+    bindSetupScreen();
+
+    var bootstrap = window.BOOTSTRAP || {};
+    if (bootstrap.app) {
+      document.getElementById('brand-name').textContent = bootstrap.app.name;
+      var version = document.getElementById('auth-version');
+      if (version) version.textContent = 'v' + bootstrap.app.version;
+    }
+    if (!bootstrap.ready) {
+      renderSetupStatus(bootstrap.status);
+      showScreen('setup-screen');
+      return;
+    }
+    bootApp();
+    state.booted = true;
+  }
+
+  return {
+    state: state, pages: pages, boot: boot, navigate: navigate, refresh: refresh,
+    registerPage: registerPage, can: can, logout: logout, setNavBadge: setNavBadge,
+    makeContext: makeContext
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', App.boot);
+</script>

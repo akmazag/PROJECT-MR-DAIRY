@@ -1,0 +1,316 @@
+<!-- =========================================================================
+     Analytics.html — Analytics & Report
+     ========================================================================= -->
+<section class="page" id="page-analytics">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Analytics</h1>
+      <p class="page-head__sub">
+        Analisa Market Return, sell out dan allocation · klik chart untuk drill-down
+      </p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn--secondary btn--sm" data-an="export" hidden>Export report</button>
+    </div>
+  </div>
+
+  <div class="tabs" data-an-tabs>
+    <button class="tab is-active" data-tab="charts">Analytics</button>
+    <button class="tab" data-tab="report">Report</button>
+  </div>
+
+  <div data-filter-slot></div>
+
+  <div data-tab-panel="charts">
+    <div class="grid grid--kpi" data-an-summary style="margin-bottom:16px"></div>
+    <div class="grid grid--2" data-an-charts></div>
+  </div>
+
+  <div data-tab-panel="report" hidden>
+    <div class="grid grid--1-2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card__head"><div class="card-title">Pilih report</div></div>
+        <div class="card__body"><div data-report-list class="stack stack--sm"></div></div>
+      </div>
+      <div class="card">
+        <div class="card__head">
+          <div><div class="card-title" data-report-title>Preview</div>
+            <div class="caption" data-report-desc>Pilih report untuk melihat data</div></div>
+          <button class="btn btn--primary btn--sm" data-an="export-current" hidden>
+            Export CSV
+          </button>
+        </div>
+        <div class="card__body card__body--flush"><div data-report-preview></div></div>
+        <div data-report-pagination></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+definePage('analytics', {
+  title: 'Analytics',
+  breadcrumb: ['MR Dairy', 'Analytics'],
+  permission: 'analytics.view',
+  filters: ['dateRange', 'region', 'area', 'account', 'sku', 'category', 'cluster'],
+
+  mount: function (ctx) {
+    ctx.root.__state = { tab: 'charts', report: null, reportPage: 1 };
+    ctx.all('[data-an-tabs] .tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var name = tab.getAttribute('data-tab');
+        ctx.root.__state.tab = name;
+        ctx.all('[data-an-tabs] .tab').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
+        ctx.all('[data-tab-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-tab-panel') !== name; });
+        ctx.el('[data-an="export"]').hidden = name !== 'report' || !App.can('report.export');
+        if (name === 'report') Analytics.loadReports(ctx);
+        else Analytics.load(ctx);
+      });
+    });
+    ctx.root.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-an]');
+      if (!btn) return;
+      if (btn.getAttribute('data-an') === 'export' || btn.getAttribute('data-an') === 'export-current') {
+        Analytics.exportReport(ctx);
+      }
+    });
+  },
+
+  load: function (ctx) {
+    if (ctx.params && ctx.params.drill) {
+      var drill = ctx.params.drill;
+      ctx.params.drill = null;
+      setTimeout(function () { Analytics.drill(ctx, drill.dimension, drill.key); }, 300);
+    }
+    if (ctx.root.__state.tab === 'report') Analytics.loadReports(ctx);
+    else Analytics.load(ctx);
+  }
+});
+
+var Analytics = {
+
+  load: function (ctx) {
+    ctx.el('[data-an-summary]').innerHTML = UI.skeletonKpi(4);
+    ctx.el('[data-an-charts]').innerHTML = [0, 1, 2, 3].map(function () {
+      return '<div class="card"><div class="card__body">' + UI.skeletonChart(220) + '</div></div>';
+    }).join('');
+
+    Api.call('analytics.overview', { filters: ctx.filters() }).then(function (data) {
+      ctx.root.__an = data;
+      paint(function () {
+        Analytics.renderSummary(ctx, data);
+        Analytics.renderCharts(ctx, data);
+      });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat analytics');
+      ctx.el('[data-an-charts]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+      ctx.el('[data-an-summary]').innerHTML = '';
+    });
+  },
+
+  renderSummary: function (ctx, data) {
+    var s = data.summary;
+    ctx.el('[data-an-summary]').innerHTML = [
+      UI.kpiCard({
+        label: 'MR %', valueHtml: UI.fmt.decimal(s.mrPercent, 2) + '<small>%</small>', accent: true,
+        iconName: 'target', sub: 'target ' + UI.fmt.decimal(s.targetMrPercent, 2) + '%'
+      }),
+      UI.kpiCard({ label: 'Sell Out', valueHtml: UI.fmt.compact(s.totalSellOut), unit: 'qty', iconName: 'trending-up' }),
+      UI.kpiCard({
+        label: 'Market Return', valueHtml: UI.fmt.compact(s.totalReturn), unit: 'qty', iconName: 'package',
+        sub: UI.fmt.compactCurrency(s.totalReturnValue)
+      }),
+      UI.kpiCard({
+        label: 'Pending MR', valueHtml: UI.fmt.number(s.pendingMr), unit: 'dok', iconName: 'clock',
+        sub: s.missedPo + ' missed PO'
+      })
+    ].join('');
+  },
+
+  renderCharts: function (ctx, data) {
+    var order = ['mrTrend', 'sellOutTrend', 'returnTrend', 'mrByAccount', 'mrBySku',
+      'allocationVsSellOut', 'riskDistribution', 'pendingMr', 'soStatus', 'clusterDistribution'];
+    var host = ctx.el('[data-an-charts]');
+    host.innerHTML = order.map(function (id) {
+      var chart = data.charts[id];
+      if (!chart) return '';
+      return '<div class="card"><div class="card__head"><div>'
+        + '<div class="card-title">' + UI.escapeHtml(chart.title) + '</div>'
+        + '<div class="caption">' + UI.escapeHtml(chart.subtitle || '') + '</div></div></div>'
+        + '<div class="card__body"><div data-chart-host="' + id + '"></div></div></div>';
+    }).join('');
+
+    order.forEach(function (id) {
+      var chart = data.charts[id];
+      var container = host.querySelector('[data-chart-host="' + id + '"]');
+      if (!chart || !container) return;
+      var spec = Object.assign({}, chart, {
+        height: 230,
+        onSelect: function (key) {
+          if (!chart.drill) return;
+          Analytics.drill(ctx, chart.drill.dimension, key);
+        }
+      });
+      Charts.render(container, spec);
+    });
+  },
+
+  drill: function (ctx, dimension, key) {
+    Drawer.open({
+      wide: true, title: 'Drill-down', sub: dimension + ' · ' + key,
+      body: UI.skeletonTable(6, 5)
+    });
+    Api.call('analytics.drill', { dimension: dimension, key: key, filters: ctx.filters() })
+      .then(function (data) {
+        if (!data.rows.length) {
+          Drawer.setBody(UI.emptyState({
+            icon: 'inbox', title: 'Tidak ada detail', desc: 'Tidak ditemukan baris untuk kriteria ini.'
+          }));
+          return;
+        }
+        var body = data.type === 'mr' ? UI.table({
+          compact: true,
+          columns: [
+            { key: 'MR_ID', label: 'MR', render: function (r) { return '<span class="mono">' + UI.escapeHtml(r.MR_ID) + '</span>'; } },
+            { key: 'accountName', label: 'Account', render: function (r) { return UI.escapeHtml(r.accountName); } },
+            { key: 'skuName', label: 'SKU', render: function (r) { return UI.escapeHtml(r.skuName); } },
+            { key: 'RETURN_QTY', label: 'Qty', align: 'right', render: function (r) { return UI.fmt.number(r.RETURN_QTY); } },
+            { key: 'MR_STATUS', label: 'Status', align: 'center', render: function (r) { return UI.statusBadge(r.MR_STATUS); } }
+          ],
+          rows: data.rows,
+          rowAttrs: function (row) { return 'style="cursor:pointer" data-drill-mr="' + UI.escapeHtml(row.MR_ID) + '"'; }
+        }) : UI.table({
+          compact: true,
+          columns: [
+            {
+              key: 'accountName', label: 'Account / SKU', render: function (r) {
+                return '<span class="t-strong">' + UI.escapeHtml(r.accountName) + '</span>'
+                  + '<span class="table__cell-sub">' + UI.escapeHtml(r.skuName) + '</span>';
+              }
+            },
+            { key: 'totalSellOut', label: 'Sell Out', align: 'right', render: function (r) { return UI.fmt.number(r.totalSellOut); } },
+            { key: 'totalReturn', label: 'Return', align: 'right', render: function (r) { return UI.fmt.number(r.totalReturn); } },
+            { key: 'mrPercent', label: 'MR %', align: 'right', render: function (r) { return UI.fmt.percent(r.mrPercent, 2); } },
+            { key: 'currentStock', label: 'Stock', align: 'right', render: function (r) { return UI.fmt.number(r.currentStock); } },
+            { key: 'riskLevel', label: 'Risiko', align: 'center', render: function (r) { return UI.riskBadge(r.riskLevel, r.riskScore); } }
+          ],
+          rows: data.rows,
+          rowAttrs: function (row) {
+            return 'style="cursor:pointer" data-drill-pair="' + UI.escapeHtml(row.accountId)
+              + '|' + UI.escapeHtml(row.skuId) + '"';
+          }
+        });
+
+        Drawer.open({
+          wide: true, title: data.title, sub: UI.fmt.number(data.total) + ' baris ditemukan',
+          body: '<div class="card"><div class="card__body card__body--flush">' + body + '</div></div>'
+        });
+
+        qsa('[data-drill-mr]').forEach(function (tr) {
+          tr.addEventListener('click', function () {
+            Drawer.close();
+            App.navigate('mr', { mrId: tr.getAttribute('data-drill-mr') });
+          });
+        });
+        qsa('[data-drill-pair]').forEach(function (tr) {
+          tr.addEventListener('click', function () {
+            var parts = tr.getAttribute('data-drill-pair').split('|');
+            Drawer.close();
+            App.navigate('distribution', { review: { accountId: parts[0], skuId: parts[1] } });
+          });
+        });
+      }).catch(function (err) {
+        Drawer.setBody(UI.alert('danger', 'Drill-down gagal', err.message || ''));
+      });
+  },
+
+  /* ---- Report ---- */
+  loadReports: function (ctx) {
+    ctx.el('[data-an="export"]').hidden = !App.can('report.export');
+    Api.call('analytics.reports', {}).then(function (data) {
+      ctx.root.__reports = data.reports;
+      ctx.el('[data-report-list]').innerHTML = data.reports.map(function (report) {
+        return '<button class="demo-account" style="width:100%" data-report="' + report.id + '">'
+          + '<b>' + UI.escapeHtml(report.name) + '</b>'
+          + '<span>' + UI.escapeHtml(report.description) + '</span></button>';
+      }).join('');
+      ctx.all('[data-report]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          ctx.root.__state.report = btn.getAttribute('data-report');
+          ctx.root.__state.reportPage = 1;
+          ctx.all('[data-report]').forEach(function (b) {
+            b.style.borderColor = b === btn ? 'var(--petrol-500)' : '';
+            b.style.background = b === btn ? 'var(--petrol-50)' : '';
+          });
+          Analytics.loadReportData(ctx);
+        });
+      });
+      if (!ctx.root.__state.report && data.reports.length) {
+        ctx.el('[data-report]').click();
+      } else if (ctx.root.__state.report) {
+        Analytics.loadReportData(ctx);
+      }
+    }).catch(function (err) { Api.handle(err, 'Gagal memuat daftar report'); });
+  },
+
+  loadReportData: function (ctx) {
+    var type = ctx.root.__state.report;
+    if (!type) return;
+    var meta = (ctx.root.__reports || []).filter(function (r) { return r.id === type; })[0] || {};
+    ctx.el('[data-report-title]').textContent = meta.name || type;
+    ctx.el('[data-report-desc]').textContent = meta.description || '';
+    ctx.el('[data-report-preview]').innerHTML = UI.skeletonTable(8, 6);
+    ctx.el('[data-an="export-current"]').hidden = !App.can('report.export');
+
+    Api.call('analytics.report', {
+      type: type, filters: ctx.filters(), page: ctx.root.__state.reportPage, pageSize: 20
+    }).then(function (data) {
+      if (!data.rows.length) {
+        ctx.el('[data-report-preview]').innerHTML = UI.emptyState({
+          icon: 'file', title: 'Report kosong',
+          desc: 'Tidak ada data untuk filter yang dipilih. Ubah periode atau filter lalu coba lagi.'
+        });
+        ctx.el('[data-report-pagination]').innerHTML = '';
+        return;
+      }
+      ctx.el('[data-report-preview]').innerHTML = UI.table({
+        compact: true,
+        columns: data.headers.map(function (header) {
+          var isNumber = /QTY|VALUE|PERCENT|ALLOCATION|STOCK|SELL_OUT|SCORE|DAYS/.test(header);
+          return {
+            key: header, label: header.replace(/_/g, ' '), align: isNumber ? 'right' : 'left',
+            render: function (row) {
+              var value = row[header];
+              if (value === null || value === undefined || value === '') return '<span class="text-muted">—</span>';
+              if (isNumber && !isNaN(Number(value))) return UI.fmt.number(Number(value), header.indexOf('PERCENT') !== -1 ? 2 : 0);
+              return UI.escapeHtml(value);
+            }
+          };
+        }),
+        rows: data.rows
+      });
+      ctx.el('[data-report-pagination]').innerHTML = UI.pagination(data.meta);
+      ctx.all('[data-report-pagination] .page-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (btn.disabled) return;
+          ctx.root.__state.reportPage = Number(btn.getAttribute('data-page'));
+          Analytics.loadReportData(ctx);
+        });
+      });
+    }).catch(function (err) {
+      Api.handle(err, 'Gagal memuat report');
+      ctx.el('[data-report-preview]').innerHTML = UI.alert('danger', 'Data tidak dapat dimuat', err.message || '');
+    });
+  },
+
+  exportReport: function (ctx) {
+    var type = ctx.root.__state.report || 'DISTRIBUTION_PLANNING';
+    Toast.info('Menyiapkan file', 'Export sedang diproses di server.');
+    Api.call('analytics.export', { type: type, filters: ctx.filters() }).then(function (data) {
+      downloadCsv(data.filename, data.csv);
+      Toast.success('Export selesai', data.rowCount + ' baris diunduh.');
+    }).catch(function (err) { Api.handle(err, 'Export gagal'); });
+  }
+};
+</script>
